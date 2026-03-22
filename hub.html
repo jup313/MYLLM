@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🤖 MyLLM — AI Hub</title>
+  <style>
+    :root {
+      --bg: #080c18;
+      --surface: #0f1424;
+      --surface2: #141828;
+      --border: #1e2540;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --accent-blue: #6366f1;
+      --accent-pink: #f472b6;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Background grid ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(99,102,241,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,102,241,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Top gradient bar ── */
+    .top-bar {
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #6366f1, #a78bfa, #f472b6, transparent);
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+    /* ── Header ── */
+    header { padding: 40px 0 32px; text-align: center; }
+    .logo { font-size: 44px; font-weight: 900; letter-spacing: -1px; }
+    .logo span { background: linear-gradient(135deg, #c7d2fe, #ffffff, #fbcfe8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .subtitle { font-size: 15px; color: var(--muted); margin-top: 8px; }
+
+    /* ── Status pill ── */
+    .status-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 18px 0 0; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid; }
+    .badge.blue  { background: #1e2a4a; border-color: #3b82f6; color: #60a5fa; }
+    .badge.green { background: #0f2218; border-color: #22c55e; color: #4ade80; }
+    .badge.red   { background: #1a0e0e; border-color: #ef4444; color: #f87171; }
+    .badge.purple{ background: #1a1040; border-color: #a78bfa; color: #c4b5fd; }
+
+    /* ── Section label ── */
+    .section-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--muted); margin: 36px 0 14px; padding-left: 2px;
+    }
+
+    /* ── Tool grid ── */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 16px; }
+
+    /* ── Tool card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 22px 18px;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+      transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: var(--card-color, #6366f1);
+      opacity: 0.7;
+    }
+    .card:hover {
+      transform: translateY(-3px);
+      border-color: var(--card-color, #6366f1);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px var(--card-color, #6366f1);
+    }
+    .card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+    .card-icon { font-size: 28px; }
+    .card-port {
+      font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+      color: var(--muted); font-family: 'SF Mono', 'Fira Mono', monospace;
+    }
+    .card-title { font-size: 16px; font-weight: 700; color: #f1f5f9; margin-bottom: 6px; }
+    .card-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .card-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; }
+    .tag {
+      font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      color: var(--muted);
+    }
+    .card-status {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; color: var(--muted); margin-top: 12px;
+    }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--card-color); box-shadow: 0 0 6px var(--card-color); }
+
+    /* ── Offline card ── */
+    .card.offline { opacity: 0.55; pointer-events: none; }
+    .card.offline:hover { transform: none; }
+
+    /* ── Quick-start panel ── */
+    .quickstart {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 24px;
+      margin-top: 36px;
+    }
+    .quickstart h3 { font-size: 14px; font-weight: 700; color: #94a3b8; margin-bottom: 14px; letter-spacing: 0.5px; }
+    .cmd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+    .cmd-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+    .cmd-tool { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .cmd-code { font-size: 12px; color: #a5b4fc; font-family: 'SF Mono', 'Fira Mono', 'Courier New', monospace; }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center; padding: 32px 0 40px; color: var(--muted); font-size: 12px; margin-top: 40px;
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: #6366f1; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+<div class="top-bar"></div>
+
+<div class="container">
+  <header>
+    <div class="logo">🤖 <span>MyLLM Hub</span></div>
+    <p class="subtitle">Personal AI Stack on Mac · 100% Local · No Cloud · No Subscriptions</p>
+    <div class="status-row">
+      <span class="badge blue">🍎 Apple Silicon MPS</span>
+      <span class="badge green">🔒 100% Private</span>
+      <span class="badge red">☁️ No Cloud</span>
+      <span class="badge purple">🛠 7 Tools</span>
+      <span class="badge green">💵 $0 / month</span>
+    </div>
+  </header>
+
+  <!-- ══ Core AI ══ -->
+  <div class="section-label">🧠 Core AI Engine</div>
+  <div class="grid">
+
+    <a href="http://localhost:3000" target="_blank" class="card" style="--card-color:#6366f1;">
+      <div class="card-header">
+        <div class="card-icon">💬</div>
+        <div class="card-port">:3000</div>
+      </div>
+      <div class="card-title">Open WebUI</div>
+      <div class="card-desc">Chat with local AI models. Web search via SearXNG. Shopping tool. Voice input via Whisper STT.</div>
+      <div class="card-tags">
+        <span class="tag">Ollama</span>
+        <span class="tag">mistral:7b</span>
+        <span class="tag">deepseek-coder</span>
+        <span class="tag">Docker</span>
+      </div>
+      <div class="card-status"><div class="dot"></div> localhost:3000</div>
+    </a>
+
+    <a href="http://localhost:8080" target="_blank" class="card" style="--card-color:#38bdf8;">
+      <div class="card-header">
+        <div class="card-icon">🔍</div>
+        <div class="card-port">:8080</div>
+      </div>
+      <div class="card-title">SearXNG</div>
+      <div class="card-desc">Private meta-search engine. No tracking. Powers web search inside Open WebUI.</div>
+      <div class="card-tags">
+        <span class="tag">Private Search</span>
+        <span class="tag">No Tracking</span>
+        <span class="tag">Docker</span>
+      </div>
+      <div class="card-status"><div class="dot"></div> localhost:8080</div>
+    </a>
+
+  </div>
+
+  <!-- ══ Finance & Email ══ -->
+  <div class="section-label">📊 Finance & Productivity</div>
+  <div class="grid">
+
+    <a href="http://localhost:8000/portfolio" target="_blank" class="card" style="--card-color:#22c55e;">
+      <div class="card-header">
+        <div class="card-icon">📈</div>
+        <div class="card-port">:8000</div>
+      </div>
+      <div class="card-title">Quant AI</div>
+      <div class="card-desc">Stock & crypto analysis with portfolio tracker, gain/loss, allocation charts, and live prices.</div>
+      <div class="card-tags">
+        <span class="tag">FastAPI</span>
+        <span class="tag">ChromaDB</span>
+        <span class="tag">vectorbt</span>
+        <span class="tag">Yahoo Finance</span>
+      </div>
+      <div class="card-status"><div class="dot"></div> localhost:8000/portfolio</div>
+    </a>
+
+    <a href="http://localhost:5051" target="_blank" class="card" style="--card-color:#f59e0b;">
+      <div class="card-header">
+        <div class="card-icon">📬</div>
+        <div class="card-port">:5051</div>
+      </div>
+      <div class="card-title">Gmail AI Manager</div>
+      <div class="card-desc">AI email triage, auto-summarize inbox, draft replies, detect meetings & add to Google Calendar.</div>
+      <div class="card-tags">
+        <span class="tag">Gmail API</span>
+        <span class="tag">Google Calendar</span>
+        <span class="tag">Flask</span>
+        <span class="tag">OAuth2</span>
+      </div>
+      <div class="card-status"><div class="dot"></div> localhost:5051</div>
+    </a>
+
+  </div>
+
+  <!-- ══ Creative AI ══ -->
+  <div class="section-label">🎨 Creative AI</div>
+  <div class="grid">
+
+    <a href="http://localhost:5050" target="_blank" class="card" style="--card-color:#f472b6;">
+      <div class="card-header">
+        <div class="card-icon">🎨</div>
+        <div class="card-port">:5050</div>
+      </div>
+      <div class="card-title">Stable Diffusion <span style="font-size:11px;color:#fce7f3;background:rgba(244,114,182,0.2);border-radius:4px;padding:1px 6px;vertical-align:middle;">NEW</span></div>
+      <div class="card-desc">Local text-to-image generation. SDXL-Turbo — ~3–8s per image. Apple Silicon MPS. No API key needed.</div>
+      <div class="card-tags">
+        <span class="tag">SDXL-Turbo</span>
+        <span class="tag">HuggingFace</span>
+        <span class="tag">MPS</span>
+        <span class="tag">Flask</span>
+      </div>
+      <div class="card-status"><div class="dot"></div> localhost:5050</div>
+    </a>
+
+    <a href="http://localhost:5053" target="_blank" class="card" style="--card-color:#ec4899;">
+      <div class="card-header">
+        <div class="card-icon">🧊</div>
+        <div class="card-port">:5053</div>
+      </div>
+      <div class="card-title">TripoSR 3D Pipeline</div>
+      <div class="card-desc">Image → 3D mesh generation using Apple Silicon MPS. Export OBJ / GLB for Blender, Unity, or web.</div>
+      <div class="card-tags">
+        <span class="tag">TripoSR</span>
+        <span class="tag">Image→3D</span>
+        <span class="tag">OBJ/GLB</span>
+        <span class="tag">MPS</span>
+      </div>
+      <div class="card-status"><div class="dot"></div> localhost:5053</div>
+    </a>
+
+  </div>
+
+  <!-- ══ Business & Voice ══ -->
+  <div class="section-label">🤖 Business AI & Voice</div>
+  <div class="grid">
+
+    <a href="http://localhost:5055" target="_blank" class="card" style="--card-color:#a78bfa;">
+      <div class="card-header">
+        <div class="card-icon">🤖</div>
+        <div class="card-port">:5055</div>
+      </div>
+      <div class="card-title">Tax AI Social</div>
+      <div class="card-desc">AI social media engine for tax firms. Auto-generates Instagram, Facebook & TikTok posts daily. 35+ compliance rules.</div>
+      <div class="card-tags">
+        <span class="tag">Instagram</span>
+        <span class="tag">Facebook</span>
+        <span class="tag">TikTok</span>
+        <span class="tag">Meta API</span>
+        <span class="tag">mistral:7b</span>
+      </div>
+      <div class="card-status"><div class="dot"></div> localhost:5055</div>
+    </a>
+
+    <a href="http://localhost:9000/health" target="_blank" class="card" style="--card-color:#2dd4bf;">
+      <div class="card-header">
+        <div class="card-icon">🎙️</div>
+        <div class="card-port">:9000</div>
+      </div>
+      <div class="card-title">Whisper STT</div>
+      <div class="card-desc">100% local speech-to-text. Plug into Open WebUI microphone. OpenAI-compatible API. Multi-language support.</div>
+      <div class="card-tags">
+        <span class="tag">openai/whisper</span>
+        <span class="tag">small model</span>
+        <span class="tag">OpenAI API</span>
+        <span class="tag">Multi-lang</span>
+      </div>
+      <div class="card-status"><div class="dot"></div> localhost:9000</div>
+    </a>
+
+  </div>
+
+  <!-- ══ Quick Start ══ -->
+  <div class="quickstart">
+    <h3>⚡ QUICK START — run each tool</h3>
+    <div class="cmd-grid">
+      <div class="cmd-item">
+        <div class="cmd-tool">💬 Open WebUI + SearXNG</div>
+        <div class="cmd-code">docker compose up -d</div>
+      </div>
+      <div class="cmd-item">
+        <div class="cmd-tool">📈 Quant AI</div>
+        <div class="cmd-code">cd quant_api &amp;&amp; python main.py</div>
+      </div>
+      <div class="cmd-item">
+        <div class="cmd-tool">📬 Gmail AI Manager</div>
+        <div class="cmd-code">cd gmail-ai-manager &amp;&amp; bash start.sh</div>
+      </div>
+      <div class="cmd-item">
+        <div class="cmd-tool">🎨 Stable Diffusion</div>
+        <div class="cmd-code">cd stable-diffusion &amp;&amp; bash start.sh</div>
+      </div>
+      <div class="cmd-item">
+        <div class="cmd-tool">🧊 TripoSR 3D</div>
+        <div class="cmd-code">cd triposr-pipeline &amp;&amp; bash start-ui.sh</div>
+      </div>
+      <div class="cmd-item">
+        <div class="cmd-tool">🤖 Tax AI Social</div>
+        <div class="cmd-code">cd tax-ai-social &amp;&amp; bash start.sh</div>
+      </div>
+      <div class="cmd-item">
+        <div class="cmd-tool">🎙️ Whisper STT</div>
+        <div class="cmd-code">cd whisper-stt &amp;&amp; bash start.sh</div>
+      </div>
+      <div class="cmd-item">
+        <div class="cmd-tool">🦙 Ollama LLM</div>
+        <div class="cmd-code">ollama serve</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<footer>
+  <div class="container">
+    <p>🤖 MyLLM — 100% local · Apple Silicon · <a href="https://github.com/jup313/MYLLM" target="_blank">github.com/jup313/MYLLM</a></p>
+    <p style="margin-top:6px;">Powered by Ollama · Open WebUI · HuggingFace · Flask · Docker</p>
+  </div>
+</footer>
+
+</body>
+</html>
