@@ -46,8 +46,28 @@ services:
     networks:
       - myllm-net
 
+  # ─────────────────────────────────────────────
+  # Quant API – Financial data, indicators, backtesting, vector memory
+  # Port 8001
+  # ─────────────────────────────────────────────
+  quant-api:
+    build:
+      context: ./quant_api
+      dockerfile: Dockerfile
+    container_name: quant-api
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    volumes:
+      - quant-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - myllm-net
+
 volumes:
   open-webui-data:
+  quant-data:
 
 networks:
   myllm-net:
