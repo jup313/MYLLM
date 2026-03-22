@@ -82,7 +82,8 @@ def _load_pipeline(model_id: str):
 
     try:
         repo = MODELS.get(model_id, model_id)
-        dtype = torch.float16 if device in ("cuda", "mps") else torch.float32
+        # MPS must use float32 — float16 causes black/NaN images on Apple Silicon
+        dtype = torch.float32 if device == "mps" else (torch.float16 if device == "cuda" else torch.float32)
 
         # Use AutoPipeline for broad compatibility
         pipe = AutoPipelineForText2Image.from_pretrained(
@@ -91,13 +92,17 @@ def _load_pipeline(model_id: str):
             variant="fp16" if device == "cuda" else None,
             use_safetensors=True,
         )
-        pipe = pipe.to(device)
-
-        # Memory optimizations
+        # ── MPS fix: SDXL VAE decode on MPS produces black/NaN images with float16.
+        # enable_sequential_cpu_offload() routes UNet on MPS and VAE decode on CPU,
+        # completely avoiding the black image bug while keeping GPU acceleration.
         if device == "mps":
-            pipe.enable_attention_slicing()
+            pipe.enable_sequential_cpu_offload()
+            log.info("🍎 MPS: sequential_cpu_offload enabled to prevent black image bug")
         elif device == "cuda":
+            pipe.to(device)
             pipe.enable_model_cpu_offload()
+        else:
+            pipe = pipe.to(device)
 
         _pipe       = pipe
         _pipe_model = model_id
@@ -187,13 +192,15 @@ def api_generate():
     if pipe is None:
         return jsonify({"success": False, "error": _load_status.get("error", "Pipeline not loaded")}), 500
 
-    # Seed
+    # Seed — use CPU generator when sequential_cpu_offload is active (MPS)
+    # because offloaded pipelines route through CPU
+    gen_device = "cpu" if _device == "mps" else _device
     generator = None
     if seed != -1:
-        generator = torch.Generator(device=_device).manual_seed(seed)
+        generator = torch.Generator(device=gen_device).manual_seed(seed)
     else:
         seed = torch.randint(0, 2**32, (1,)).item()
-        generator = torch.Generator(device=_device).manual_seed(seed)
+        generator = torch.Generator(device=gen_device).manual_seed(seed)
 
     log.info(f"Generating: '{prompt[:80]}' model={model_id} steps={steps} size={width}x{height} seed={seed}")
     t0 = time.time()
