@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📈 Quant AI — Portfolio Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117; --surface: #1e2235; --border: #2d3148;
+      --text: #e2e8f0; --muted: #64748b; --accent: #22c55e;
+      --red: #ef4444; --blue: #3b82f6; --yellow: #f59e0b; --purple: #a78bfa;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: system-ui,-apple-system,sans-serif; min-height: 100vh; }
+
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 20px; font-weight: 700; }
+    header span { color: var(--muted); font-size: 13px; }
+    .refresh-btn { margin-left: auto; background: var(--accent); color: #000; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; }
+    .refresh-btn:hover { opacity: 0.85; }
+
+    .main { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+    /* Summary cards */
+    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .card-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .card-value { font-size: 24px; font-weight: 700; }
+    .card-value.positive { color: var(--accent); }
+    .card-value.negative { color: var(--red); }
+    .card-value.neutral { color: var(--text); }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+    .tab { padding: 10px 20px; cursor: pointer; color: var(--muted); font-size: 14px; font-weight: 500; border-bottom: 2px solid transparent; transition: all .15s; }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab:hover:not(.active) { color: var(--text); }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; color: var(--muted); font-size: 12px; text-transform: uppercase; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .ticker-badge { font-weight: 700; color: var(--blue); font-size: 15px; }
+    .positive { color: var(--accent); }
+    .negative { color: var(--red); }
+    .neutral { color: var(--muted); }
+    .del-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .del-btn:hover { border-color: var(--red); color: var(--red); }
+
+    /* Add form */
+    .add-form { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .add-form h3 { font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 14px; }
+    .form-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .form-row input { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 14px; flex: 1; min-width: 100px; }
+    .form-row input:focus { outline: none; border-color: var(--accent); }
+    .form-row button { background: var(--accent); color: #000; border: none; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; white-space: nowrap; }
+    .form-row button:hover { opacity: 0.85; }
+
+    /* Chart */
+    .chart-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+    .chart-wrap h3 { font-size: 14px; color: var(--muted); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px; }
+    canvas { max-height: 260px; }
+
+    /* Spinner */
+    .loading { text-align: center; padding: 40px; color: var(--muted); }
+
+    /* Section panels */
+    .panel { display: none; }
+    .panel.active { display: block; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span style="font-size:22px">📈</span>
+  <h1>Quant AI — Portfolio Tracker</h1>
+  <span>localhost:8000</span>
+  <button class="refresh-btn" onclick="refreshAll()">⟳ Refresh</button>
+</header>
+
+<div class="main">
+
+  <!-- Summary Cards -->
+  <div class="summary-grid">
+    <div class="card">
+      <div class="card-label">Total Value</div>
+      <div class="card-value neutral" id="totalValue">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Total Cost</div>
+      <div class="card-value neutral" id="totalCost">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Total Gain / Loss</div>
+      <div class="card-value" id="totalGain">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Positions</div>
+      <div class="card-value neutral" id="posCount">—</div>
+    </div>
+  </div>
+
+  <!-- Donut Chart -->
+  <div class="chart-wrap">
+    <h3>Portfolio Allocation</h3>
+    <canvas id="allocChart"></canvas>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('positions')">📊 Positions</div>
+    <div class="tab" onclick="showTab('watchlist')">👁️ Watchlist</div>
+  </div>
+
+  <!-- Positions Panel -->
+  <div class="panel active" id="panel-positions">
+    <div class="add-form">
+      <h3>➕ Add / Update Position</h3>
+      <div class="form-row">
+        <input id="p-ticker" placeholder="Ticker (e.g. AAPL)" style="max-width:120px; text-transform:uppercase">
+        <input id="p-shares" placeholder="Shares" type="number" min="0" step="0.001" style="max-width:110px">
+        <input id="p-cost" placeholder="Avg Cost $" type="number" min="0" step="0.01" style="max-width:120px">
+        <input id="p-notes" placeholder="Notes (optional)">
+        <button onclick="addPosition()">Add Position</button>
+      </div>
+    </div>
+
+    <div class="loading" id="pos-loading">Loading positions...</div>
+    <table id="pos-table" style="display:none">
+      <thead>
+        <tr>
+          <th>Ticker</th><th>Shares</th><th>Avg Cost</th><th>Current</th>
+          <th>Market Value</th><th>Gain/Loss</th><th>Today</th><th>Notes</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="pos-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Watchlist Panel -->
+  <div class="panel" id="panel-watchlist">
+    <div class="add-form">
+      <h3>➕ Add to Watchlist</h3>
+      <div class="form-row">
+        <input id="w-ticker" placeholder="Ticker (e.g. TSLA)" style="max-width:120px; text-transform:uppercase">
+        <input id="w-notes" placeholder="Notes (optional)">
+        <button onclick="addWatchlist()">Add to Watchlist</button>
+      </div>
+    </div>
+
+    <div class="loading" id="wl-loading">Loading watchlist...</div>
+    <table id="wl-table" style="display:none">
+      <thead>
+        <tr><th>Ticker</th><th>Price</th><th>Today</th><th>Notes</th><th></th></tr>
+      </thead>
+      <tbody id="wl-tbody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+const API = '';  // Same origin
+let allocChart = null;
+
+function fmt(n, dec=2) {
+  if (n == null || isNaN(n)) return '—';
+  return '$' + Number(n).toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+function fmtN(n, dec=2) {
+  if (n == null || isNaN(n)) return '—';
+  return Number(n).toFixed(dec);
+}
+function pct(n) {
+  if (n == null || isNaN(n)) return '—';
+  const sign = n >= 0 ? '+' : '';
+  return `<span class="${n >= 0 ? 'positive' : 'negative'}">${sign}${n.toFixed(2)}%</span>`;
+}
+function gainCell(g) {
+  const cls = g >= 0 ? 'positive' : 'negative';
+  const sign = g >= 0 ? '+' : '';
+  return `<span class="${cls}">${sign}${fmt(g)}</span>`;
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const tabs = document.querySelectorAll('.tab');
+  const names = ['positions', 'watchlist'];
+  tabs[names.indexOf(name)].classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+async function loadPerformance() {
+  document.getElementById('pos-loading').style.display = 'block';
+  document.getElementById('pos-table').style.display = 'none';
+  try {
+    const res = await fetch('/portfolio/performance');
+    const data = await res.json();
+    const s = data.summary;
+
+    document.getElementById('totalValue').textContent = fmt(s.total_value);
+    document.getElementById('totalCost').textContent  = fmt(s.total_cost);
+    document.getElementById('posCount').textContent   = s.position_count || 0;
+
+    const gainEl = document.getElementById('totalGain');
+    const g = s.total_gain || 0;
+    gainEl.className = 'card-value ' + (g >= 0 ? 'positive' : 'negative');
+    gainEl.innerHTML = `${g >= 0 ? '+' : ''}${fmt(g)} (${g >= 0 ? '+' : ''}${fmtN(s.total_gain_pct)}%)`;
+
+    const tbody = document.getElementById('pos-tbody');
+    tbody.innerHTML = '';
+    const colors = ['#3b82f6','#22c55e','#f59e0b','#a78bfa','#ec4899','#06b6d4','#f97316','#84cc16'];
+    const labels = [], values = [], bgColors = [];
+
+    data.positions.forEach((p, i) => {
+      labels.push(p.ticker);
+      values.push(p.market_value);
+      bgColors.push(colors[i % colors.length]);
+
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><span class="ticker-badge">${p.ticker}</span></td>
+        <td>${fmtN(p.shares, 3)}</td>
+        <td>${fmt(p.avg_cost)}</td>
+        <td>${fmt(p.current_price)}</td>
+        <td>${fmt(p.market_value)}</td>
+        <td>${gainCell(p.gain)} ${pct(p.gain_pct)}</td>
+        <td>${pct(p.day_change_pct)}</td>
+        <td style="color:var(--muted);font-size:12px">${p.notes || ''}</td>
+        <td><button class="del-btn" onclick="deletePosition('${p.ticker}')">Remove</button></td>
+      `;
+      tbody.appendChild(row);
+    });
+
+    // Allocation donut
+    updateChart(labels, values, bgColors);
+
+    document.getElementById('pos-loading').style.display = 'none';
+    document.getElementById('pos-table').style.display = 'table';
+  } catch(e) {
+    document.getElementById('pos-loading').textContent = '⚠️ Could not load positions — is the Quant API running?';
+  }
+}
+
+function updateChart(labels, values, colors) {
+  const ctx = document.getElementById('allocChart').getContext('2d');
+  if (allocChart) allocChart.destroy();
+  if (!labels.length) return;
+  allocChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#1e2235' }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: $${ctx.parsed.toFixed(2)}`
+          }
+        }
+      }
+    }
+  });
+}
+
+async function loadWatchlist() {
+  document.getElementById('wl-loading').style.display = 'block';
+  document.getElementById('wl-table').style.display = 'none';
+  try {
+    const res = await fetch('/portfolio/watchlist');
+    const data = await res.json();
+    const tbody = document.getElementById('wl-tbody');
+    tbody.innerHTML = '';
+    data.watchlist.forEach(w => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><span class="ticker-badge">${w.ticker}</span></td>
+        <td>${fmt(w.price)}</td>
+        <td>${pct(w.day_change_pct)}</td>
+        <td style="color:var(--muted);font-size:12px">${w.notes || ''}</td>
+        <td><button class="del-btn" onclick="deleteWatchlist('${w.ticker}')">Remove</button></td>
+      `;
+      tbody.appendChild(row);
+    });
+    document.getElementById('wl-loading').style.display = 'none';
+    document.getElementById('wl-table').style.display = 'table';
+  } catch(e) {
+    document.getElementById('wl-loading').textContent = '⚠️ Could not load watchlist.';
+  }
+}
+
+async function addPosition() {
+  const ticker = document.getElementById('p-ticker').value.trim().toUpperCase();
+  const shares = parseFloat(document.getElementById('p-shares').value);
+  const cost   = parseFloat(document.getElementById('p-cost').value);
+  const notes  = document.getElementById('p-notes').value.trim();
+  if (!ticker || isNaN(shares) || isNaN(cost)) { alert('Please fill in Ticker, Shares, and Avg Cost.'); return; }
+  await fetch('/portfolio/positions', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ ticker, shares, avg_cost: cost, notes })
+  });
+  document.getElementById('p-ticker').value = '';
+  document.getElementById('p-shares').value = '';
+  document.getElementById('p-cost').value = '';
+  document.getElementById('p-notes').value = '';
+  loadPerformance();
+}
+
+async function deletePosition(ticker) {
+  if (!confirm(`Remove ${ticker} from portfolio?`)) return;
+  await fetch(`/portfolio/positions/${ticker}`, { method: 'DELETE' });
+  loadPerformance();
+}
+
+async function addWatchlist() {
+  const ticker = document.getElementById('w-ticker').value.trim().toUpperCase();
+  const notes  = document.getElementById('w-notes').value.trim();
+  if (!ticker) { alert('Enter a ticker symbol.'); return; }
+  await fetch('/portfolio/watchlist', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ ticker, notes })
+  });
+  document.getElementById('w-ticker').value = '';
+  document.getElementById('w-notes').value = '';
+  loadWatchlist();
+}
+
+async function deleteWatchlist(ticker) {
+  if (!confirm(`Remove ${ticker} from watchlist?`)) return;
+  await fetch(`/portfolio/watchlist/${ticker}`, { method: 'DELETE' });
+  loadWatchlist();
+}
+
+function refreshAll() {
+  loadPerformance();
+  loadWatchlist();
+}
+
+// Init
+loadPerformance();
+loadWatchlist();
+</script>
+</body>
+</html>

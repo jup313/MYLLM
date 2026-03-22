@@ -11,11 +11,11 @@ Run a complete private AI ecosystem locally using **Ollama**, **Open WebUI**, an
 | Tool | Purpose | Port |
 |------|---------|------|
 | 💬 **Open WebUI + SearXNG** | Chat UI with private web search | :3000 / :8080 |
-| 📈 **Quant AI** | Stock & crypto analysis with local LLM | :8000 |
-| 📬 **Gmail AI Manager** | AI email triage, summarize, draft replies | :5051 |
+| 📈 **Quant AI** | Stock & crypto analysis + portfolio tracker | :8000 |
+| 📬 **Gmail AI Manager** | AI email triage, summarize, draft replies + Calendar | :5051 |
 | 🧊 **TripoSR 3D Pipeline** | Image → 3D mesh (Apple Silicon) | :5050 |
-| 🤖 **Tax AI Social** ⭐ NEW | AI social media content engine for tax/accounting firms | :5055 |
-| 🎙️ **Whisper STT** ⭐ NEW | 100% local speech-to-text for Open WebUI | :9000 |
+| 🤖 **Tax AI Social** | AI social media content engine for tax/accounting firms | :5055 |
+| 🎙️ **Whisper STT** | 100% local speech-to-text for Open WebUI | :9000 |
 
 ---
 
@@ -357,12 +357,54 @@ WHISPER_MODEL=medium bash start.sh   # Use a larger model
 
 ---
 
+## 📈 Quant AI — Portfolio Tracker Dashboard
+
+**Track your stock/crypto holdings with live prices, gain/loss, and allocation chart.**
+
+Open: **http://localhost:8000/portfolio**
+
+| Feature | Details |
+|---------|---------|
+| 📊 Positions table | Ticker, shares, avg cost, current price, gain/loss, day change |
+| 🍩 Allocation donut chart | Visual portfolio breakdown (Chart.js) |
+| 👁️ Watchlist | Track tickers without holding them |
+| ⟳ Live prices | Auto-fetches via Yahoo Finance on page load |
+| ➕ Add / remove | Simple form — no file editing needed |
+
+```bash
+cd quant_api
+python main.py
+# Open: http://localhost:8000/portfolio
+```
+
+---
+
+## 📅 Gmail AI — Calendar Integration
+
+**Detect meetings in emails and add them to Google Calendar automatically.**
+
+Open: **http://localhost:5051** → click **📅 Calendar** in sidebar
+
+| Feature | Details |
+|---------|---------|
+| 🔍 Meeting detection | Scans emails for Zoom, time mentions, meeting keywords |
+| 🤖 LLM extraction | Uses Ollama to extract date/time/location from email body |
+| 📅 One-click add | Click **📅 Add to Calendar** on any detected meeting email |
+| ➕ Manual events | Create events directly from the dashboard |
+| 📋 Upcoming view | See next 7 days of Google Calendar events |
+
+**Requires:** Google Calendar API scope (enabled automatically when you re-connect Gmail OAuth)
+
+> ⚠️ If you already connected Gmail, click **🔗 Re-connect Gmail** in Settings to add Calendar scope.
+
+---
+
 ## 🗺️ Roadmap
 
 - [ ] Stable Diffusion image generation for social posts
 - [ ] LinkedIn support for Tax AI Social
-- [ ] Quant AI portfolio tracker dashboard
-- [ ] Gmail AI calendar integration
+- [x] ~~Quant AI portfolio tracker dashboard~~ — ✅ Done! (`/portfolio`)
+- [x] ~~Gmail AI calendar integration~~ — ✅ Done! (Calendar tab)
 - [x] ~~Voice interface for Open WebUI~~ — ✅ Done! (Whisper STT)
 
 ---

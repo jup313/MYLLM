@@ -142,6 +142,7 @@
     <div class="nav-item" onclick="showPage('queue')" id="nav-queue">⏳ Approval Queue <span class="badge" id="queue-badge" style="display:none">0</span></div>
     <div class="nav-item" onclick="showPage('summaries')" id="nav-summaries">📊 Summaries</div>
     <div class="nav-item" onclick="showPage('logs')" id="nav-logs">📋 Logs</div>
+    <div class="nav-item" onclick="showPage('calendar')" id="nav-calendar">📅 Calendar</div>
     <div class="nav-item" onclick="showPage('settings')" id="nav-settings">🔧 Settings</div>
   </nav>
   <div class="sidebar-status" id="sidebar-status">
@@ -456,6 +457,77 @@
     </div>
     <button class="btn btn-green" onclick="saveSettings()">💾 Save Settings</button>
     <span id="settings-saved" style="margin-left:12px;font-size:13px;color:var(--green);display:none">✅ Saved</span>
+  </div>
+
+  <!-- ══ CALENDAR PAGE ══ -->
+  <div id="page-calendar" class="page" style="display:none">
+    <div class="page-header">
+      <div><div class="page-title">📅 Calendar</div><div class="page-subtitle">Detect meetings in emails and add to Google Calendar</div></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-gray btn-sm" onclick="loadCalendarEvents()">🔄 Refresh</button>
+        <button class="btn btn-blue btn-sm" onclick="showManualEventForm()">➕ Add Event</button>
+      </div>
+    </div>
+
+    <div id="cal-auth-warn" class="alert alert-warn" style="display:none">
+      ⚠️ <strong>Calendar not authorized.</strong> You need to re-connect Gmail with Calendar scope enabled.
+      <button class="btn btn-blue btn-sm" style="margin-left:10px" onclick="startAuth()">🔗 Re-connect Gmail</button>
+    </div>
+
+    <!-- Manual Event Form -->
+    <div id="manual-event-form" style="display:none" class="card">
+      <div class="card-title">➕ Create Calendar Event</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Title</label>
+          <input type="text" id="evt-title" placeholder="Meeting title">
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" id="evt-date">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Time (24h)</label>
+          <input type="time" id="evt-time">
+        </div>
+        <div class="form-group">
+          <label>Duration (hours)</label>
+          <input type="number" id="evt-duration" value="1" min="0.25" step="0.25">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Location / Video Link</label>
+        <input type="text" id="evt-location" placeholder="Zoom link, address, etc.">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" id="evt-description" placeholder="Optional notes">
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-green" onclick="createManualEvent()">📅 Create Event</button>
+        <button class="btn btn-gray" onclick="hideManualEventForm()">Cancel</button>
+      </div>
+      <div id="evt-result" style="margin-top:10px"></div>
+    </div>
+
+    <!-- Upcoming Events -->
+    <div class="card">
+      <div class="card-title">📅 Upcoming Events (Next 7 Days)</div>
+      <div id="cal-events-list">
+        <div class="empty-state"><div class="icon">📅</div><div>Loading upcoming events...</div></div>
+      </div>
+    </div>
+
+    <!-- Emails with Meeting Language -->
+    <div class="card">
+      <div class="card-title">📬 Recent Emails with Meeting Language</div>
+      <div style="font-size:12px;color:var(--dim);margin-bottom:12px">Emails that contain meeting/appointment language — click 📅 to add to calendar</div>
+      <div id="cal-meeting-emails">
+        <div class="empty-state"><div class="icon">🔍</div><div>Loading emails...</div></div>
+      </div>
+    </div>
   </div>
 
 </div><!-- end #main -->
@@ -1053,6 +1125,151 @@ function showToast(msg, err=false) {
   t.style.opacity = '1';
   setTimeout(() => t.style.opacity='0', 3000);
 }
+
+// ─── Calendar ──────────────────────────────────────────────────────
+
+async function loadCalendarEvents() {
+  const listEl = document.getElementById('cal-events-list');
+  listEl.innerHTML = '<div class="empty-state"><div class="icon spin">⏳</div><div>Loading...</div></div>';
+  try {
+    // Check auth
+    const authR = await fetch('/api/calendar/status');
+    const authD = await authR.json();
+    document.getElementById('cal-auth-warn').style.display = authD.authorized ? 'none' : 'block';
+    if (!authD.authorized) { listEl.innerHTML = '<div class="empty-state"><div>Re-connect Gmail to enable Calendar.</div></div>'; return; }
+
+    const r = await fetch('/api/calendar/events?days=7');
+    const d = await r.json();
+    if (!d.events || d.events.length === 0) {
+      listEl.innerHTML = '<div class="empty-state"><div class="icon">📅</div><div>No upcoming events in the next 7 days</div></div>';
+      return;
+    }
+    listEl.innerHTML = d.events.map(e => {
+      const start = e.start ? new Date(e.start).toLocaleString('en-US', {weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+      return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-weight:600;color:var(--text)">${esc(e.title)}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">🕐 ${start}${e.location ? ' · 📍 ' + esc(e.location) : ''}</div>
+        </div>
+        ${e.link ? `<a href="${e.link}" target="_blank" class="btn btn-gray btn-sm" style="text-decoration:none">Open ↗</a>` : ''}
+      </div>`;
+    }).join('');
+  } catch(err) {
+    listEl.innerHTML = `<div class="alert alert-error">❌ ${err.message}</div>`;
+  }
+  // Also load meeting emails
+  loadMeetingEmails();
+}
+
+async function loadMeetingEmails() {
+  const el = document.getElementById('cal-meeting-emails');
+  try {
+    const r = await fetch('/api/emails?limit=50');
+    const d = await r.json();
+    const meetings = [];
+    for (const email of (d.emails||[])) {
+      const body = (email.body||'') + ' ' + (email.subject||'');
+      if (/meeting|appointment|call|interview|zoom|webinar|schedule|invite|monday|tuesday|wednesday|thursday|friday|tomorrow|next week|\d{1,2}:\d{2}\s*(am|pm)/i.test(body)) {
+        meetings.push(email);
+      }
+    }
+    if (meetings.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div>No emails with meeting language detected</div></div>';
+      return;
+    }
+    el.innerHTML = meetings.map(e => `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.subject||'(no subject)')}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(e.sender||'')} · ${(e.date||'').substring(0,10)}</div>
+          <div style="font-size:12px;color:var(--dim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((e.body||e.snippet||'').substring(0,120))}</div>
+        </div>
+        <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="addEmailToCalendar('${e.id}', this)">📅 Add to Calendar</button>
+      </div>`).join('');
+  } catch(err) {
+    el.innerHTML = `<div class="alert alert-error">❌ ${err.message}</div>`;
+  }
+}
+
+async function addEmailToCalendar(emailId, btn) {
+  btn.disabled = true;
+  btn.textContent = '⏳ Processing...';
+  try {
+    const r = await fetch(`/api/calendar/create/${emailId}`, {method:'POST'});
+    const d = await r.json();
+    if (d.success) {
+      btn.textContent = '✅ Added!';
+      btn.className = 'btn btn-green btn-sm';
+      showToast(`✅ Calendar event created: ${d.title} on ${d.start}`);
+      setTimeout(loadCalendarEvents, 2000);
+    } else {
+      btn.disabled = false;
+      btn.textContent = '📅 Add to Calendar';
+      showToast('❌ ' + (d.error || 'Failed to create event'), true);
+    }
+  } catch(err) {
+    btn.disabled = false;
+    btn.textContent = '📅 Add to Calendar';
+    showToast('❌ ' + err.message, true);
+  }
+}
+
+function showManualEventForm() {
+  document.getElementById('manual-event-form').style.display = 'block';
+  document.getElementById('evt-result').innerHTML = '';
+  // Set default date to tomorrow
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  document.getElementById('evt-date').value = tomorrow.toISOString().split('T')[0];
+  document.getElementById('evt-time').value = '10:00';
+}
+
+function hideManualEventForm() {
+  document.getElementById('manual-event-form').style.display = 'none';
+}
+
+async function createManualEvent() {
+  const title = document.getElementById('evt-title').value.trim();
+  if (!title) { alert('Please enter a title.'); return; }
+  const body = {
+    title,
+    date:           document.getElementById('evt-date').value || null,
+    time:           document.getElementById('evt-time').value || null,
+    duration_hours: parseFloat(document.getElementById('evt-duration').value) || 1,
+    location:       document.getElementById('evt-location').value.trim() || null,
+    description:    document.getElementById('evt-description').value.trim() || null,
+  };
+  const resEl = document.getElementById('evt-result');
+  resEl.innerHTML = '<span style="color:var(--muted)">⏳ Creating event...</span>';
+  try {
+    const r = await fetch('/api/calendar/create', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const d = await r.json();
+    if (d.success) {
+      resEl.innerHTML = `<div class="alert alert-success">✅ Event created: <b>${esc(d.title)}</b> on ${d.start}${d.event_link ? ` · <a href="${d.event_link}" target="_blank" style="color:var(--blue)">Open in Calendar ↗</a>` : ''}</div>`;
+      setTimeout(() => { hideManualEventForm(); loadCalendarEvents(); }, 2500);
+    } else {
+      resEl.innerHTML = `<div class="alert alert-error">❌ ${esc(d.error||'Failed')}</div>`;
+    }
+  } catch(err) {
+    resEl.innerHTML = `<div class="alert alert-error">❌ ${err.message}</div>`;
+  }
+}
+
+// Auto-load calendar when page shown
+const origShowPage = showPage;
+// Patch showPage to also trigger calendar load
+window.showPage = function(name) {
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).style.display = 'block';
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'inbox') { loadInboxStats(); loadInbox(); }
+  if (name === 'queue') loadQueue();
+  if (name === 'summaries') loadSummaries();
+  if (name === 'logs') loadLogs();
+  if (name === 'settings') loadSettings();
+  if (name === 'calendar') loadCalendarEvents();
+};
 
 // Check for OAuth callback params
 const params = new URLSearchParams(window.location.search);

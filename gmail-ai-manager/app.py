@@ -309,6 +309,87 @@ def api_logs():
     return jsonify({"logs": get_audit_log(limit=limit)})
 
 
+# ── Calendar ─────────────────────────────────────────────────────────
+
+@app.route("/api/calendar/status")
+def api_calendar_status():
+    """Check if Google Calendar is authorized."""
+    try:
+        from calendar_engine import is_calendar_authorized
+        authorized = is_calendar_authorized()
+        return jsonify({"authorized": authorized})
+    except Exception as e:
+        return jsonify({"authorized": False, "error": str(e)})
+
+
+@app.route("/api/calendar/events")
+def api_calendar_events():
+    """Get upcoming calendar events (next 7 days)."""
+    try:
+        from calendar_engine import get_upcoming_events
+        days = int(request.args.get("days", 7))
+        events = get_upcoming_events(days=days)
+        return jsonify({"events": events, "count": len(events)})
+    except Exception as e:
+        return jsonify({"error": str(e), "events": []}), 500
+
+
+@app.route("/api/calendar/detect/<email_id>")
+def api_calendar_detect(email_id):
+    """Check if an email contains meeting/appointment language."""
+    email = get_email(email_id)
+    if not email:
+        return jsonify({"error": "Not found"}), 404
+    try:
+        from calendar_engine import has_meeting_language
+        body = (email.get("body") or "") + " " + (email.get("subject") or "")
+        detected = has_meeting_language(body)
+        return jsonify({"email_id": email_id, "has_meeting": detected})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/calendar/create/<email_id>", methods=["POST"])
+def api_calendar_create_from_email(email_id):
+    """
+    Extract event details from email using LLM and create a Google Calendar event.
+    """
+    email = get_email(email_id)
+    if not email:
+        return jsonify({"error": "Not found"}), 404
+    try:
+        from calendar_engine import create_event_from_email
+        result = create_event_from_email(email)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/calendar/create", methods=["POST"])
+def api_calendar_create_manual():
+    """
+    Manually create a calendar event.
+    Body: { title, date, time, duration_hours, location, description }
+    """
+    data = request.get_json() or {}
+    title = data.get("title")
+    if not title:
+        return jsonify({"success": False, "error": "title is required"}), 400
+    try:
+        from calendar_engine import create_calendar_event
+        result = create_calendar_event(
+            title=title,
+            date=data.get("date"),
+            time=data.get("time"),
+            duration_hours=float(data.get("duration_hours", 1)),
+            location=data.get("location"),
+            description=data.get("description"),
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # ── LLM ──────────────────────────────────────────────────────────────
 
 @app.route("/api/llm/models")

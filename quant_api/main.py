@@ -327,6 +327,149 @@ def portfolio_risk(tickers: str, weights: Optional[str] = None, period: str = "1
     }
 
 
+# ── Portfolio Tracker ─────────────────────────────────────────────────────────
+
+from portfolio_db import (
+    get_positions, add_position, delete_position,
+    get_watchlist, add_to_watchlist, remove_from_watchlist
+)
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+import pathlib
+
+# Serve portfolio dashboard HTML
+@app.get("/portfolio", response_class=HTMLResponse)
+def portfolio_dashboard():
+    html_path = pathlib.Path(__file__).parent / "portfolio.html"
+    if html_path.exists():
+        return HTMLResponse(content=html_path.read_text())
+    return HTMLResponse("<h1>portfolio.html not found</h1>")
+
+
+class PositionRequest(BaseModel):
+    ticker: str
+    shares: float
+    avg_cost: float
+    notes: str = ""
+
+class WatchlistRequest(BaseModel):
+    ticker: str
+    notes: str = ""
+
+
+@app.get("/portfolio/positions")
+def list_positions():
+    """Get all portfolio positions (no live prices)."""
+    return {"positions": get_positions()}
+
+
+@app.post("/portfolio/positions")
+def upsert_position(req: PositionRequest):
+    """Add or update a position."""
+    add_position(req.ticker, req.shares, req.avg_cost, req.notes)
+    return {"success": True, "ticker": req.ticker.upper()}
+
+
+@app.delete("/portfolio/positions/{ticker}")
+def remove_position(ticker: str):
+    """Remove a position."""
+    delete_position(ticker)
+    return {"success": True}
+
+
+@app.get("/portfolio/performance")
+def portfolio_performance():
+    """
+    Portfolio positions enriched with live prices.
+    Returns total value, gain/loss, % change per position and totals.
+    """
+    positions = get_positions()
+    if not positions:
+        return {"positions": [], "summary": {"total_cost": 0, "total_value": 0,
+                                               "total_gain": 0, "total_gain_pct": 0}}
+
+    enriched = []
+    total_cost = 0.0
+    total_value = 0.0
+
+    for pos in positions:
+        ticker = pos["ticker"]
+        shares = pos["shares"]
+        avg_cost = pos["avg_cost"]
+        cost_basis = shares * avg_cost
+        total_cost += cost_basis
+
+        try:
+            result = _yf_chart(ticker, interval="1d", range_="5d")
+            df = _chart_to_df(result)
+            current_price = float(df["Close"].iloc[-1])
+            prev_price = float(df["Close"].iloc[-2]) if len(df) > 1 else current_price
+            day_change_pct = ((current_price - prev_price) / prev_price * 100) if prev_price else 0
+        except Exception:
+            current_price = avg_cost
+            day_change_pct = 0.0
+
+        market_value = shares * current_price
+        gain = market_value - cost_basis
+        gain_pct = (gain / cost_basis * 100) if cost_basis else 0
+        total_value += market_value
+
+        enriched.append({
+            **pos,
+            "current_price": round(current_price, 4),
+            "market_value": round(market_value, 2),
+            "cost_basis": round(cost_basis, 2),
+            "gain": round(gain, 2),
+            "gain_pct": round(gain_pct, 2),
+            "day_change_pct": round(day_change_pct, 2),
+        })
+
+    total_gain = total_value - total_cost
+    total_gain_pct = (total_gain / total_cost * 100) if total_cost else 0
+
+    return {
+        "positions": enriched,
+        "summary": {
+            "total_cost": round(total_cost, 2),
+            "total_value": round(total_value, 2),
+            "total_gain": round(total_gain, 2),
+            "total_gain_pct": round(total_gain_pct, 2),
+            "position_count": len(enriched),
+        }
+    }
+
+
+@app.get("/portfolio/watchlist")
+def list_watchlist():
+    """Get watchlist with live quotes."""
+    items = get_watchlist()
+    enriched = []
+    for item in items:
+        ticker = item["ticker"]
+        try:
+            result = _yf_chart(ticker, interval="1d", range_="5d")
+            df = _chart_to_df(result)
+            price = float(df["Close"].iloc[-1])
+            prev  = float(df["Close"].iloc[-2]) if len(df) > 1 else price
+            chg   = round((price - prev) / prev * 100, 2) if prev else 0
+        except Exception:
+            price, chg = 0.0, 0.0
+        enriched.append({**item, "price": round(price, 4), "day_change_pct": chg})
+    return {"watchlist": enriched}
+
+
+@app.post("/portfolio/watchlist")
+def add_watchlist(req: WatchlistRequest):
+    add_to_watchlist(req.ticker, req.notes)
+    return {"success": True, "ticker": req.ticker.upper()}
+
+
+@app.delete("/portfolio/watchlist/{ticker}")
+def del_watchlist(ticker: str):
+    remove_from_watchlist(ticker)
+    return {"success": True}
+
+
 # ── Vector Memory ─────────────────────────────────────────────────────────────
 
 @app.post("/memory/store")
