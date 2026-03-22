@@ -1,8 +1,18 @@
+<div align="center">
+
+![MyLLM Banner](banner.svg)
+
+</div>
+
 # 🤖 MyLLM – Personal AI Stack on Your Mac
 
-Run a complete private AI ecosystem locally using **Ollama**, **Open WebUI**, and purpose-built tools for email, finance, 3D generation, and social media marketing. No cloud. No subscriptions. No data leaving your machine.
+> Run a complete private AI ecosystem locally using **Ollama**, **Open WebUI**, and purpose-built tools for email, finance, 3D generation, image generation, speech-to-text, and social media marketing. **No cloud. No subscriptions. No data leaving your machine.**
+
+<div align="center">
 
 ![Architecture](triposr-pipeline/architecture.svg)
+
+</div>
 
 ---
 
