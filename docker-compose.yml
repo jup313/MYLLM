@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  # ─────────────────────────────────────────────
+  # SearXNG – private search engine (web search + shopping)
+  # ─────────────────────────────────────────────
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+    networks:
+      - myllm-net
+
+  # ─────────────────────────────────────────────
+  # Open WebUI – chat interface for Ollama
+  # ─────────────────────────────────────────────
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    volumes:
+      - open-webui-data:/app/backend/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # Connect to Ollama running on the host machine
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      # Web search via SearXNG
+      - ENABLE_WEB_SEARCH=true
+      - WEB_SEARCH_ENGINE=searxng
+      - SEARXNG_QUERY_URL=http://searxng:8080/search?q=<query>&format=json
+      - WEB_SEARCH_RESULT_COUNT=5
+      - WEB_SEARCH_CONCURRENT_REQUESTS=10
+      - BYPASS_WEB_SEARCH_EMBEDDING_AND_RETRIEVAL=true
+      - BYPASS_WEB_SEARCH_WEB_LOADER=true
+    depends_on:
+      - searxng
+    networks:
+      - myllm-net
+
+volumes:
+  open-webui-data:
+
+networks:
+  myllm-net:
+    driver: bridge
