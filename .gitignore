@@ -4,17 +4,51 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
 
 # Docker volumes (don't commit data)
 data/
 volumes/
 
-# Secrets / env files
+# Secrets / env files — NEVER commit these
 .env
 .env.local
+.env.production
+.env.staging
 *.secret
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Google / OAuth tokens
+credentials.json
+token.json
+token.pickle
+client_secret*.json
+*_credentials.json
 
 # Python
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+env/
+.venv/
+*.egg
+
+# Node
+node_modules/
+package-lock.json
+
+# Generated / output files
+stable-diffusion/generated/
+whisper-stt/outputs/
+triposr-pipeline/outputs/
