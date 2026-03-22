@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+generated/*.png
+generated/*.jpg
+generated/*.jpeg
+generated/*.webp
+.env
+*.safetensors
+*.bin
+models/

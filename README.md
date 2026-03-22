@@ -13,6 +13,7 @@ Run a complete private AI ecosystem locally using **Ollama**, **Open WebUI**, an
 | 💬 **Open WebUI + SearXNG** | Chat UI with private web search | :3000 / :8080 |
 | 📈 **Quant AI** | Stock & crypto analysis + portfolio tracker | :8000 |
 | 📬 **Gmail AI Manager** | AI email triage, summarize, draft replies + Calendar | :5051 |
+| 🎨 **Stable Diffusion** | Local text-to-image generation · Apple Silicon MPS | :5050 |
 | 🧊 **TripoSR 3D Pipeline** | Image → 3D mesh (Apple Silicon) | :5050 |
 | 🤖 **Tax AI Social** | AI social media content engine for tax/accounting firms | :5055 |
 | 🎙️ **Whisper STT** | 100% local speech-to-text for Open WebUI | :9000 |
@@ -399,9 +400,58 @@ Open: **http://localhost:5051** → click **📅 Calendar** in sidebar
 
 ---
 
+## 🎨 Tool 7 — Stable Diffusion Image Generation
+
+**100% local text-to-image generation on your Mac. No API key. No cloud. No limits.**
+
+```bash
+cd stable-diffusion
+bash setup.sh     # First time only (~2-3 min)
+bash start.sh
+# Open: http://localhost:5050
+```
+
+| Feature | Details |
+|---------|---------|
+| ⚡ SDXL-Turbo | Default model — ~3–8s per image on M1/M2/M3 |
+| 🧠 6 Models | SDXL-Turbo, SD 2.1, SD 1.5, DreamShaper, OpenJourney, Realistic Vision |
+| 📐 Any size | 512×512 to 1280×1280 with 1:1, 16:9, 9:16, 4:3 presets |
+| 🎲 Seed control | Reproduce or vary any image |
+| 🗂️ History | Browse all generated images |
+| 📱 Social Post tab | Auto-generate images for Tax AI Social posts |
+
+### Tax AI Social Integration
+
+When Stable Diffusion is running (`:5050`), Tax AI Social will **automatically generate images** for Instagram and Facebook posts. Just start both services:
+
+```bash
+# Terminal 1
+cd stable-diffusion && bash start.sh
+
+# Terminal 2
+cd tax-ai-social && bash start.sh
+```
+
+Images are auto-selected based on post content (IRS/debt → resolution style, family → family style, etc.).
+
+### API
+
+```bash
+# Generate image
+curl -X POST http://localhost:5050/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "professional tax accountant, modern office, 4K", "model": "sdxl-turbo", "steps": 4}'
+
+# Use in Python
+from stable_diffusion.sd_client import generate_for_post
+img_url = generate_for_post("Tax deadline April 15th", specialty="tax_preparation")
+```
+
+---
+
 ## 🗺️ Roadmap
 
-- [ ] Stable Diffusion image generation for social posts
+- [x] ~~Stable Diffusion image generation~~ — ✅ Done! (`stable-diffusion/` + Tax AI Social integration)
 - [ ] LinkedIn support for Tax AI Social
 - [x] ~~Quant AI portfolio tracker dashboard~~ — ✅ Done! (`/portfolio`)
 - [x] ~~Gmail AI calendar integration~~ — ✅ Done! (Calendar tab)

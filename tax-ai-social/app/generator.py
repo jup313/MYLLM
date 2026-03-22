@@ -1,8 +1,22 @@
 import os
+import sys
 from dotenv import load_dotenv
 from app.llm import generate_from_llm
 from app.compliance import compliance_check, add_disclaimer_if_needed
 from app.database import save_post
+
+# ── Stable Diffusion image generation (optional) ──────────────────
+_SD_CLIENT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "stable-diffusion")
+if _SD_CLIENT_PATH not in sys.path:
+    sys.path.insert(0, _SD_CLIENT_PATH)
+
+try:
+    from sd_client import generate_for_post, is_sd_running
+    _SD_AVAILABLE = True
+except ImportError:
+    _SD_AVAILABLE = False
+    def is_sd_running(): return False
+    def generate_for_post(caption, specialty): return None
 
 load_dotenv()
 
@@ -88,6 +102,16 @@ def generate_post(platform, specialty):
     if contact_block:
         content = content + contact_block
 
+    # ── Optional: generate image with Stable Diffusion ────────────
+    image_url = None
+    if platform in ("instagram", "facebook") and is_sd_running():
+        try:
+            image_url = generate_for_post(caption=content, specialty=specialty)
+            if image_url:
+                print(f"  🎨 Image generated: {image_url}")
+        except Exception as img_err:
+            print(f"  ⚠️ SD image generation failed (non-fatal): {img_err}")
+
     # Save to DB
     post_id = save_post(platform, specialty, content, result["passed"])
 
@@ -96,7 +120,8 @@ def generate_post(platform, specialty):
         "platform": platform,
         "specialty": specialty,
         "content": content,
-        "compliance": result
+        "compliance": result,
+        "image_url": image_url,
     }
 
 

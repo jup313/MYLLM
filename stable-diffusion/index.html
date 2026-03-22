@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎨 Stable Diffusion — Local Image Generator</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f172a;--surface:#1e293b;--surface2:#263348;--border:#334155;
+    --text:#e2e8f0;--muted:#94a3b8;--dim:#64748b;
+    --green:#4ade80;--blue:#60a5fa;--purple:#a78bfa;
+    --red:#f87171;--yellow:#fbbf24;--pink:#f472b6;
+    --teal:#2dd4bf;
+  }
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+  #app{display:flex;min-height:100vh;gap:0}
+  /* Sidebar */
+  #sidebar{width:320px;background:var(--surface);border-right:1px solid var(--border);padding:20px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;flex-shrink:0}
+  #main{flex:1;padding:24px;overflow-y:auto;display:flex;flex-direction:column;gap:20px}
+  /* Logo */
+  .logo{text-align:center;padding:8px 0 4px}
+  .logo h1{font-size:22px;font-weight:800;background:linear-gradient(135deg,var(--purple),var(--pink),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  .logo p{font-size:12px;color:var(--dim);margin-top:4px}
+  /* Status bar */
+  #status-bar{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;display:flex;align-items:center;gap:8px}
+  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .dot-green{background:var(--green);box-shadow:0 0 6px var(--green)}
+  .dot-yellow{background:var(--yellow);animation:pulse 1.5s infinite}
+  .dot-red{background:var(--red)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  /* Form elements */
+  .section-label{font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+  textarea,input[type=text],input[type=number],select{
+    width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+    padding:9px 12px;border-radius:8px;font-size:13px;outline:none;font-family:inherit;transition:.15s
+  }
+  textarea:focus,input:focus,select:focus{border-color:var(--purple);box-shadow:0 0 0 2px rgba(167,139,250,.15)}
+  textarea{resize:vertical;line-height:1.6}
+  input::placeholder,textarea::placeholder{color:var(--dim)}
+  /* Buttons */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border-radius:9px;border:none;cursor:pointer;font-size:14px;font-weight:600;transition:.15s;font-family:inherit}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn-purple{background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;box-shadow:0 2px 12px rgba(168,85,247,.3)}
+  .btn-purple:hover:not(:disabled){background:linear-gradient(135deg,#6d28d9,#9333ea);box-shadow:0 4px 16px rgba(168,85,247,.4)}
+  .btn-green{background:#166534;color:var(--green);border:1px solid #166534}
+  .btn-green:hover:not(:disabled){background:#15803d}
+  .btn-red{background:#7f1d1d;color:var(--red);border:1px solid #7f1d1d}
+  .btn-red:hover:not(:disabled){background:#991b1b}
+  .btn-gray{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+  .btn-gray:hover:not(:disabled){color:var(--text);background:var(--border)}
+  .btn-sm{padding:6px 12px;font-size:12px}
+  .btn-full{width:100%}
+  /* Range slider */
+  input[type=range]{-webkit-appearance:none;width:100%;height:4px;background:var(--border);border-radius:2px;outline:none;border:none;padding:0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;background:var(--purple);border-radius:50%;cursor:pointer}
+  .range-row{display:flex;align-items:center;gap:10px}
+  .range-row input[type=range]{flex:1}
+  .range-val{font-size:13px;color:var(--blue);font-weight:600;min-width:32px;text-align:right}
+  /* Form sections */
+  .form-section{display:flex;flex-direction:column;gap:8px}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  /* Generate button wrapper */
+  #generate-wrap{position:sticky;bottom:0;background:var(--surface);padding:12px 0 0;border-top:1px solid var(--border);margin-top:auto}
+  /* Main area */
+  .page-title{font-size:24px;font-weight:700}
+  .page-subtitle{font-size:13px;color:var(--dim);margin-top:2px}
+  /* Result canvas */
+  #result-area{min-height:400px;background:var(--surface);border:1px solid var(--border);border-radius:14px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+  #result-img{max-width:100%;max-height:80vh;border-radius:10px;display:none}
+  #result-placeholder{text-align:center;color:var(--dim);padding:40px}
+  #result-placeholder .icon{font-size:64px;margin-bottom:12px;filter:grayscale(1);opacity:.4}
+  #result-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,.85);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+  .spinner{width:48px;height:48px;border:3px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  /* Result meta */
+  #result-meta{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:12px;display:none}
+  #result-meta .meta-row{display:flex;gap:16px;flex-wrap:wrap}
+  #result-meta .meta-item{color:var(--dim)}
+  #result-meta .meta-item b{color:var(--text)}
+  /* Actions bar */
+  #result-actions{display:none;gap:10px;flex-wrap:wrap}
+  /* History */
+  #history-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+  .history-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;transition:.15s}
+  .history-card:hover{border-color:var(--purple);transform:translateY(-2px)}
+  .history-card img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+  .history-card-info{padding:8px 10px;font-size:11px;color:var(--dim)}
+  /* Alerts */
+  .alert{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:4px}
+  .alert-error{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);color:var(--red)}
+  .alert-success{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);color:var(--green)}
+  .alert-info{background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.2);color:#93c5fd}
+  /* Tabs */
+  .tabs{display:flex;gap:2px;background:var(--surface2);border-radius:10px;padding:4px}
+  .tab{flex:1;text-align:center;padding:8px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);transition:.15s}
+  .tab.active{background:var(--surface);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+  .tab-content{display:none}
+  .tab-content.active{display:block}
+  /* Prompt suggestions */
+  .prompt-chip{display:inline-block;padding:4px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:16px;font-size:11px;color:var(--muted);cursor:pointer;margin:2px;transition:.1s}
+  .prompt-chip:hover{border-color:var(--purple);color:var(--text)}
+  /* Copy button animation */
+  @keyframes copied{0%{opacity:1}50%{opacity:.4}100%{opacity:1}}
+  /* Scrollbar */
+  ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+  /* Mobile */
+  @media(max-width:768px){#app{flex-direction:column}#sidebar{width:100%;border-right:none;border-bottom:1px solid var(--border)}}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ── SIDEBAR ── -->
+<div id="sidebar">
+  <div class="logo">
+    <h1>🎨 Stable Diffusion</h1>
+    <p>Local image generation · Apple Silicon MPS</p>
+  </div>
+
+  <!-- Status -->
+  <div id="status-bar">
+    <span class="dot dot-yellow" id="status-dot"></span>
+    <span id="status-text">Loading model...</span>
+  </div>
+
+  <!-- Prompt -->
+  <div class="form-section">
+    <div class="section-label">✨ Prompt</div>
+    <textarea id="prompt" rows="4" placeholder="A professional headshot of a tax accountant in a modern office, photorealistic, 4K, sharp focus..."></textarea>
+    <div id="prompt-chips">
+      <div class="prompt-chip" onclick="appendChip('photorealistic, 4K')">📸 Photorealistic 4K</div>
+      <div class="prompt-chip" onclick="appendChip('professional business photo')">💼 Business</div>
+      <div class="prompt-chip" onclick="appendChip('cinematic lighting, bokeh')">🎬 Cinematic</div>
+      <div class="prompt-chip" onclick="appendChip('digital art, vibrant colors')">🎨 Digital Art</div>
+      <div class="prompt-chip" onclick="appendChip('watercolor illustration')">🖌️ Watercolor</div>
+      <div class="prompt-chip" onclick="appendChip('minimalist flat design')">◻️ Minimal</div>
+      <div class="prompt-chip" onclick="appendChip('social media post, Instagram style')">📱 Social Media</div>
+      <div class="prompt-chip" onclick="appendChip('tax season, money, calculator, documents')">🧾 Tax Theme</div>
+    </div>
+  </div>
+
+  <!-- Negative prompt -->
+  <div class="form-section">
+    <div class="section-label">🚫 Negative Prompt</div>
+    <textarea id="negative-prompt" rows="2" placeholder="blurry, ugly, distorted, watermark, text, nsfw">blurry, ugly, distorted, watermark, text, nsfw, low quality, bad anatomy</textarea>
+  </div>
+
+  <!-- Model -->
+  <div class="form-section">
+    <div class="section-label">🧠 Model</div>
+    <select id="model-select">
+      <option value="sdxl-turbo">⚡ SDXL-Turbo (fastest · 4 steps)</option>
+      <option value="sd21">🔵 SD 2.1 (balanced · 20 steps)</option>
+      <option value="sd15">🟢 SD 1.5 (classic · 20 steps)</option>
+      <option value="dreamshaper">🌈 DreamShaper 8 (artistic)</option>
+      <option value="openjourney">🚀 OpenJourney v4 (Midjourney-style)</option>
+      <option value="realistic">📷 Realistic Vision 5.1 (photos)</option>
+    </select>
+    <div style="font-size:11px;color:var(--dim);margin-top:4px">First use downloads model (~2-7 GB)</div>
+  </div>
+
+  <!-- Steps + Guidance -->
+  <div class="form-section">
+    <div class="section-label">🔢 Inference Steps</div>
+    <div class="range-row">
+      <input type="range" id="steps" min="1" max="50" value="4" oninput="document.getElementById('steps-val').textContent=this.value">
+      <span class="range-val" id="steps-val">4</span>
+    </div>
+    <div class="section-label" style="margin-top:12px">🎯 Guidance Scale (CFG)</div>
+    <div class="range-row">
+      <input type="range" id="guidance" min="0" max="15" step="0.5" value="0" oninput="document.getElementById('guidance-val').textContent=this.value">
+      <span class="range-val" id="guidance-val">0</span>
+    </div>
+    <div style="font-size:11px;color:var(--dim)">0 = SDXL-Turbo mode · 7.5 = standard SD</div>
+  </div>
+
+  <!-- Size -->
+  <div class="form-section">
+    <div class="section-label">📐 Image Size</div>
+    <div class="form-row">
+      <div>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:4px">Width</div>
+        <select id="width-select">
+          <option value="512">512</option>
+          <option value="768">768</option>
+          <option value="1024" selected>1024</option>
+          <option value="1280">1280</option>
+        </select>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:4px">Height</div>
+        <select id="height-select">
+          <option value="512">512</option>
+          <option value="768">768</option>
+          <option value="1024" selected>1024</option>
+          <option value="1280">1280</option>
+        </select>
+      </div>
+    </div>
+    <!-- Quick presets -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+      <div class="prompt-chip" onclick="setSize(1024,1024)">◻️ 1:1</div>
+      <div class="prompt-chip" onclick="setSize(1024,576)">🖥 16:9</div>
+      <div class="prompt-chip" onclick="setSize(576,1024)">📱 9:16</div>
+      <div class="prompt-chip" onclick="setSize(1024,768)">📷 4:3</div>
+    </div>
+  </div>
+
+  <!-- Seed -->
+  <div class="form-section">
+    <div class="section-label">🎲 Seed (-1 = random)</div>
+    <input type="number" id="seed" value="-1" min="-1">
+  </div>
+
+  <!-- Generate button -->
+  <div id="generate-wrap">
+    <button class="btn btn-purple btn-full" onclick="generate()" id="gen-btn">
+      ✨ Generate Image
+    </button>
+    <div id="gen-error" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<!-- ── MAIN ── -->
+<div id="main">
+  <div>
+    <div class="page-title">🎨 Stable Diffusion</div>
+    <div class="page-subtitle">Local AI image generation · 100% private · Apple Silicon MPS</div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('generate')">⚡ Generate</div>
+    <div class="tab" onclick="switchTab('history')">🗂️ History</div>
+    <div class="tab" onclick="switchTab('social')">📱 Social Post</div>
+  </div>
+
+  <!-- Generate Tab -->
+  <div id="tab-generate" class="tab-content active">
+    <!-- Result canvas -->
+    <div id="result-area">
+      <div id="result-placeholder">
+        <div class="icon">🖼️</div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:6px">Ready to generate</div>
+        <div style="font-size:13px">Enter a prompt and click ✨ Generate Image</div>
+        <div style="font-size:12px;color:var(--dim);margin-top:10px">
+          Powered by SDXL-Turbo on Apple Silicon MPS<br>
+          ~3-8 seconds per image on M1/M2/M3/M4
+        </div>
+      </div>
+      <img id="result-img" alt="Generated image">
+      <div id="result-overlay">
+        <div class="spinner"></div>
+        <div id="gen-progress" style="color:var(--muted);font-size:13px">Generating...</div>
+        <div id="gen-time" style="color:var(--dim);font-size:12px"></div>
+      </div>
+    </div>
+
+    <!-- Result meta -->
+    <div id="result-meta">
+      <div class="meta-row">
+        <div class="meta-item">⏱️ <b id="meta-time">—</b>s</div>
+        <div class="meta-item">🧠 <b id="meta-model">—</b></div>
+        <div class="meta-item">📐 <b id="meta-size">—</b></div>
+        <div class="meta-item">🔢 <b id="meta-steps">—</b> steps</div>
+        <div class="meta-item">🎲 seed: <b id="meta-seed">—</b></div>
+        <div class="meta-item">⚙️ <b id="meta-device">—</b></div>
+      </div>
+    </div>
+
+    <!-- Result actions -->
+    <div id="result-actions" style="display:none;gap:10px;flex-wrap:wrap">
+      <a id="download-btn" class="btn btn-green" download>⬇️ Download PNG</a>
+      <button class="btn btn-gray" onclick="copyPromptToClipboard()">📋 Copy Prompt</button>
+      <button class="btn btn-gray" onclick="reuseSettings()">🔁 Same Seed Again</button>
+      <button class="btn btn-purple" onclick="generate()">🔀 New Variation</button>
+    </div>
+  </div>
+
+  <!-- History Tab -->
+  <div id="tab-history" class="tab-content">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="color:var(--muted);font-size:13px" id="history-count">Loading...</div>
+      <button class="btn btn-gray btn-sm" onclick="loadHistory()">🔄 Refresh</button>
+    </div>
+    <div id="history-grid">
+      <div style="color:var(--dim);padding:40px;text-align:center">Loading history...</div>
+    </div>
+  </div>
+
+  <!-- Social Post Tab -->
+  <div id="tab-social" class="tab-content">
+    <div class="alert alert-info" style="margin-bottom:16px">
+      🔗 Auto-generate images for <strong>Tax AI Social</strong> posts. Requires Tax AI Social running on :5055
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px;max-width:600px">
+      <div class="form-section">
+        <div class="section-label">🏢 Post Topic / Caption Preview</div>
+        <textarea id="social-caption" rows="4" placeholder="Paste your Tax AI Social post caption here..."></textarea>
+      </div>
+      <div class="form-section">
+        <div class="section-label">🎨 Image Style</div>
+        <select id="social-style">
+          <option value="professional business photo, office setting, tax documents, calculator, modern clean design, photorealistic">📊 Professional Business</option>
+          <option value="warm family home, documents, tax return, smiling, financial security">👨‍👩‍👧 Family Tax Filing</option>
+          <option value="IRS envelope, tax debt relief, stress to calm, financial freedom illustration">💼 Tax Resolution</option>
+          <option value="bookkeeping, spreadsheets, organized finances, clean desk, modern office">📚 Bookkeeping</option>
+          <option value="money savings, piggy bank, green dollars, happy, bright and colorful">💰 Tax Savings</option>
+          <option value="deadline approaching, calendar, urgency, professional accountant helping">⏰ Tax Deadline</option>
+        </select>
+      </div>
+      <button class="btn btn-purple" onclick="generateSocialImage()" id="social-gen-btn">
+        🎨 Generate Post Image
+      </button>
+      <div id="social-result"></div>
+    </div>
+  </div>
+
+</div><!-- end #main -->
+</div><!-- end #app -->
+
+<script>
+const API = '';
+let lastResult = null;
+let genStartTime = null;
+let genTimer = null;
+
+// ── Status polling ─────────────────────────────────────────────────
+
+async function checkStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    const dot  = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    if (d.loading) {
+      dot.className = 'dot dot-yellow';
+      text.textContent = `⏳ Loading ${d.model || 'model'}...`;
+      setTimeout(checkStatus, 3000);
+    } else if (d.loaded) {
+      dot.className = 'dot dot-green';
+      text.textContent = `✅ ${d.model} · ${d.device?.toUpperCase()}`;
+    } else if (d.error) {
+      dot.className = 'dot dot-red';
+      text.textContent = `❌ ${d.error.substring(0, 60)}`;
+    } else {
+      dot.className = 'dot dot-yellow';
+      text.textContent = 'Not loaded yet';
+      setTimeout(checkStatus, 5000);
+    }
+  } catch(e) {
+    document.getElementById('status-dot').className = 'dot dot-red';
+    document.getElementById('status-text').textContent = 'Server offline';
+    setTimeout(checkStatus, 5000);
+  }
+}
+checkStatus();
+
+// Model swap — update default steps/guidance when model changes
+document.getElementById('model-select').addEventListener('change', function() {
+  const isTurbo = this.value.includes('turbo');
+  const steps   = document.getElementById('steps');
+  const guidance = document.getElementById('guidance');
+  if (isTurbo) {
+    steps.value   = 4;
+    guidance.value = 0;
+  } else {
+    steps.value   = 20;
+    guidance.value = 7.5;
+  }
+  document.getElementById('steps-val').textContent   = steps.value;
+  document.getElementById('guidance-val').textContent = guidance.value;
+});
+
+// ── Generate ───────────────────────────────────────────────────────
+
+async function generate() {
+  const prompt = document.getElementById('prompt').value.trim();
+  if (!prompt) { showError('Please enter a prompt'); return; }
+
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating...';
+
+  // Show overlay
+  const overlay = document.getElementById('result-overlay');
+  overlay.style.display = 'flex';
+  document.getElementById('result-placeholder').style.display = 'none';
+  document.getElementById('result-img').style.display = 'none';
+  document.getElementById('result-meta').style.display = 'none';
+  document.getElementById('result-actions').style.display = 'none';
+  document.getElementById('gen-error').innerHTML = '';
+
+  // Timer
+  genStartTime = Date.now();
+  genTimer = setInterval(() => {
+    const s = ((Date.now() - genStartTime) / 1000).toFixed(1);
+    document.getElementById('gen-time').textContent = `${s}s elapsed`;
+  }, 100);
+
+  const body = {
+    prompt:          prompt,
+    negative_prompt: document.getElementById('negative-prompt').value,
+    model:           document.getElementById('model-select').value,
+    steps:           parseInt(document.getElementById('steps').value),
+    guidance:        parseFloat(document.getElementById('guidance').value),
+    width:           parseInt(document.getElementById('width-select').value),
+    height:          parseInt(document.getElementById('height-select').value),
+    seed:            parseInt(document.getElementById('seed').value),
+    format:          'url',
+  };
+
+  try {
+    const r = await fetch('/api/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    clearInterval(genTimer);
+    overlay.style.display = 'none';
+    btn.disabled = false;
+    btn.textContent = '✨ Generate Image';
+
+    if (!d.success) {
+      showError(d.error || 'Generation failed');
+      return;
+    }
+
+    lastResult = d;
+    // Show image
+    const img = document.getElementById('result-img');
+    img.src   = d.url + '?t=' + Date.now();
+    img.style.display = 'block';
+
+    // Meta
+    document.getElementById('meta-time').textContent   = d.elapsed;
+    document.getElementById('meta-model').textContent  = d.model;
+    document.getElementById('meta-size').textContent   = `${d.width}×${d.height}`;
+    document.getElementById('meta-steps').textContent  = d.steps;
+    document.getElementById('meta-seed').textContent   = d.seed;
+    document.getElementById('meta-device').textContent = (d.device || 'cpu').toUpperCase();
+    document.getElementById('result-meta').style.display = 'block';
+
+    // Actions
+    const dl = document.getElementById('download-btn');
+    dl.href     = d.url;
+    dl.download = d.filename;
+    document.getElementById('result-actions').style.display = 'flex';
+
+    // Update seed field to show what was used
+    if (document.getElementById('seed').value === '-1') {
+      document.getElementById('seed').placeholder = `Last: ${d.seed}`;
+    }
+
+  } catch(e) {
+    clearInterval(genTimer);
+    overlay.style.display = 'none';
+    btn.disabled = false;
+    btn.textContent = '✨ Generate Image';
+    showError('Server error: ' + e.message);
+  }
+}
+
+function showError(msg) {
+  document.getElementById('gen-error').innerHTML = `<div class="alert alert-error">${msg}</div>`;
+}
+
+function appendChip(text) {
+  const ta = document.getElementById('prompt');
+  const cur = ta.value.trim();
+  ta.value = cur ? cur + ', ' + text : text;
+  ta.focus();
+}
+
+function setSize(w, h) {
+  document.getElementById('width-select').value  = w;
+  document.getElementById('height-select').value = h;
+}
+
+function copyPromptToClipboard() {
+  if (!lastResult) return;
+  navigator.clipboard.writeText(lastResult.prompt);
+  const btn = event.target;
+  const orig = btn.textContent;
+  btn.textContent = '✅ Copied!';
+  setTimeout(() => btn.textContent = orig, 1500);
+}
+
+function reuseSettings() {
+  if (!lastResult) return;
+  document.getElementById('seed').value = lastResult.seed;
+  generate();
+}
+
+// ── Tabs ───────────────────────────────────────────────────────────
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const names = ['generate', 'history', 'social'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'history') loadHistory();
+}
+
+// ── History ────────────────────────────────────────────────────────
+
+async function loadHistory() {
+  const grid = document.getElementById('history-grid');
+  try {
+    const r = await fetch('/api/history?limit=100');
+    const d = await r.json();
+    document.getElementById('history-count').textContent = `${d.images.length} images generated`;
+    if (d.images.length === 0) {
+      grid.innerHTML = '<div style="color:var(--dim);padding:40px;text-align:center;grid-column:1/-1">No images generated yet</div>';
+      return;
+    }
+    grid.innerHTML = d.images.map(img => `
+      <div class="history-card" onclick="loadFromHistory('${img.url}','${img.filename}')">
+        <img src="${img.url}" loading="lazy" alt="${img.filename}">
+        <div class="history-card-info">
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${img.filename}</div>
+          <div style="margin-top:2px">${(img.size/1024).toFixed(0)} KB · ${img.created.substring(0,16)}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    grid.innerHTML = `<div class="alert alert-error">Error loading history: ${e.message}</div>`;
+  }
+}
+
+function loadFromHistory(url, filename) {
+  switchTab('generate');
+  const img = document.getElementById('result-img');
+  img.src = url + '?t=' + Date.now();
+  img.style.display = 'block';
+  document.getElementById('result-placeholder').style.display = 'none';
+  document.getElementById('result-actions').style.display = 'flex';
+  document.getElementById('download-btn').href     = url;
+  document.getElementById('download-btn').download = filename;
+}
+
+// ── Social Post Image Generator ────────────────────────────────────
+
+async function generateSocialImage() {
+  const caption = document.getElementById('social-caption').value.trim();
+  const style   = document.getElementById('social-style').value;
+  const btn     = document.getElementById('social-gen-btn');
+  const resEl   = document.getElementById('social-result');
+
+  if (!caption && !style) { resEl.innerHTML = '<div class="alert alert-error">Enter a caption or select a style</div>'; return; }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating...';
+  resEl.innerHTML = '<div class="alert alert-info">⏳ Generating image for social post...</div>';
+
+  // Build a prompt that combines the style + key words from caption
+  const words = caption.replace(/[^a-zA-Z\s]/g,'').split(/\s+/).filter(w=>w.length>4).slice(0,5).join(', ');
+  const prompt = `${style}${words ? ', ' + words : ''}, high quality, professional marketing image, 1:1 square format`;
+
+  try {
+    const r = await fetch('/api/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        prompt,
+        negative_prompt: 'text, watermark, blurry, ugly, nsfw, low quality',
+        model:  document.getElementById('model-select').value,
+        steps:  4,
+        guidance: 0,
+        width:  1024,
+        height: 1024,
+        format: 'url',
+      })
+    });
+    const d = await r.json();
+    btn.disabled = false;
+    btn.textContent = '🎨 Generate Post Image';
+    if (!d.success) {
+      resEl.innerHTML = `<div class="alert alert-error">❌ ${d.error}</div>`;
+      return;
+    }
+    resEl.innerHTML = `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;overflow:hidden;max-width:400px">
+        <img src="${d.url}?t=${Date.now()}" style="width:100%;display:block">
+        <div style="padding:14px">
+          <div style="font-size:12px;color:var(--dim);margin-bottom:10px">⏱️ ${d.elapsed}s · 🧠 ${d.model} · 🎲 ${d.seed}</div>
+          <div style="font-size:11px;color:var(--dim);margin-bottom:10px;word-break:break-all"><b>Prompt:</b> ${d.prompt}</div>
+          <div style="display:flex;gap:8px">
+            <a href="${d.url}" download="${d.filename}" class="btn btn-green btn-sm">⬇️ Download</a>
+            <button class="btn btn-gray btn-sm" onclick="copyImageUrl('${d.url}')">📋 Copy URL</button>
+          </div>
+        </div>
+      </div>`;
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '🎨 Generate Post Image';
+    resEl.innerHTML = `<div class="alert alert-error">❌ ${e.message}</div>`;
+  }
+}
+
+function copyImageUrl(url) {
+  navigator.clipboard.writeText(window.location.origin + url);
+  alert('✅ Image URL copied to clipboard!');
+}
+
+// Keyboard shortcut: Ctrl/Cmd + Enter to generate
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    generate();
+  }
+});
+</script>
+</body>
+</html>
