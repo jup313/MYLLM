@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧊 TripoSR Pipeline</title>
+<style>
+  :root {
+    --bg:      #0f1117;
+    --surface: #1a1d2e;
+    --card:    #20243a;
+    --border:  #2d3155;
+    --accent:  #6366f1;
+    --accent2: #8b5cf6;
+    --green:   #10b981;
+    --yellow:  #f59e0b;
+    --red:     #ef4444;
+    --text:    #e2e8f0;
+    --muted:   #94a3b8;
+    --radius:  12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  header {
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header .logo { font-size: 2rem; }
+  header h1 { font-size: 1.5rem; font-weight: 700; }
+  header p  { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+  header .badge {
+    margin-left: auto;
+    background: rgba(99,102,241,0.2);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 768px) { main { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+  .panel-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-title span { font-size: 1.1rem; }
+
+  /* Pipeline steps indicator */
+  .steps-bar {
+    grid-column: 1 / -1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+  }
+  .step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 20px;
+    width: 50%;
+    height: 2px;
+    background: var(--border);
+    transform: translateX(100%);
+    z-index: 0;
+  }
+  .step-icon {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: var(--card);
+    border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+    position: relative;
+    z-index: 1;
+    transition: all 0.3s;
+  }
+  .step.active  .step-icon { border-color: var(--accent);  background: rgba(99,102,241,0.15); }
+  .step.done    .step-icon { border-color: var(--green);   background: rgba(16,185,129,0.15); }
+  .step.error   .step-icon { border-color: var(--red);     background: rgba(239,68,68,0.15); }
+  .step-label { font-size: 0.7rem; color: var(--muted); text-align: center; font-weight: 600; }
+  .step.active .step-label { color: var(--accent); }
+  .step.done   .step-label { color: var(--green); }
+
+  /* Form */
+  label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+  input, select, textarea {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 80px; }
+  select option { background: var(--card); }
+
+  .form-row { margin-bottom: 16px; }
+
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .range-row {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .range-row input[type=range] {
+    flex: 1; padding: 0; height: 6px; cursor: pointer;
+    accent-color: var(--accent);
+  }
+  .range-val {
+    font-size: 0.85rem; font-weight: 700;
+    color: var(--accent); min-width: 36px; text-align: right;
+  }
+
+  .checkbox-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+  }
+  .checkbox-row input[type=checkbox] {
+    width: 16px; height: 16px; accent-color: var(--accent); flex-shrink: 0;
+  }
+  .checkbox-row label { margin: 0; font-size: 0.85rem; color: var(--text); }
+
+  /* Buttons */
+  .btn {
+    padding: 11px 22px; border-radius: 8px; border: none;
+    font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff; width: 100%; justify-content: center;
+  }
+  .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-ghost {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Status / Log */
+  .log-box {
+    background: #0a0c14;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    line-height: 1.7;
+    min-height: 180px;
+    max-height: 320px;
+    overflow-y: auto;
+    color: var(--muted);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .log-box .log-info    { color: #60a5fa; }
+  .log-box .log-success { color: var(--green); }
+  .log-box .log-warning { color: var(--yellow); }
+  .log-box .log-error   { color: var(--red); }
+
+  /* Progress bar */
+  .progress-wrap {
+    background: var(--card);
+    border-radius: 99px;
+    height: 6px;
+    overflow: hidden;
+    margin: 12px 0;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 99px;
+    transition: width 0.5s ease;
+    width: 0%;
+  }
+  .progress-bar.indeterminate {
+    width: 40%;
+    animation: progress-slide 1.4s ease-in-out infinite;
+  }
+  @keyframes progress-slide {
+    0%   { transform: translateX(-200%); }
+    100% { transform: translateX(350%); }
+  }
+
+  /* Output gallery */
+  .output-gallery {
+    grid-column: 1 / -1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 14px;
+    margin-top: 16px;
+  }
+  .gallery-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .gallery-item:hover { border-color: var(--accent); transform: scale(1.02); }
+  .gallery-item img {
+    width: 100%; aspect-ratio: 1; object-fit: cover; display: block;
+  }
+  .gallery-item .item-info {
+    padding: 8px 10px; font-size: 0.7rem; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .gallery-item .item-type {
+    font-size: 0.65rem; font-weight: 700;
+    padding: 2px 6px; border-radius: 4px; margin-right: 4px;
+    display: inline-block;
+  }
+  .type-img { background: rgba(99,102,241,0.2); color: var(--accent); }
+  .type-glb { background: rgba(16,185,129,0.2); color: var(--green); }
+
+  /* Status pill */
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 20px;
+    font-size: 0.75rem; font-weight: 600;
+  }
+  .status-idle    { background: rgba(148,163,184,0.1); color: var(--muted); }
+  .status-running { background: rgba(99,102,241,0.15); color: var(--accent); }
+  .status-done    { background: rgba(16,185,129,0.15); color: var(--green); }
+  .status-error   { background: rgba(239,68,68,0.15);  color: var(--red); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .dot.pulse { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Result card */
+  .result-card {
+    background: var(--card);
+    border: 1px solid var(--green);
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 14px;
+    display: none;
+  }
+  .result-card.show { display: block; }
+  .result-title { font-size: 0.75rem; font-weight: 700; color: var(--green); margin-bottom: 10px; }
+  .result-link {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    background: var(--surface);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-size: 0.8rem;
+    color: var(--text);
+    text-decoration: none;
+    border: 1px solid var(--border);
+    word-break: break-all;
+  }
+  .result-link:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Divider */
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🧊</div>
+  <div>
+    <h1>TripoSR Pipeline</h1>
+    <p>Idea → Stable Diffusion → 3D Mesh · Apple Silicon 16GB</p>
+  </div>
+  <div class="badge">🍎 Apple MPS</div>
+</header>
+
+<main>
+
+  <!-- Pipeline Steps Bar -->
+  <div class="steps-bar">
+    <div class="step" id="step1">
+      <div class="step-icon">🧠</div>
+      <div class="step-label">1. LLM Prompt</div>
+    </div>
+    <div class="step" id="step2">
+      <div class="step-icon">🎨</div>
+      <div class="step-label">2. Generate Image</div>
+    </div>
+    <div class="step" id="step3">
+      <div class="step-icon">🧊</div>
+      <div class="step-label">3. TripoSR Mesh</div>
+    </div>
+    <div class="step" id="step4">
+      <div class="step-icon">✅</div>
+      <div class="step-label">4. Export OBJ/GLB</div>
+    </div>
+  </div>
+
+  <!-- Left Panel: Input -->
+  <div class="panel">
+    <div class="panel-title"><span>⚙️</span> Pipeline Input</div>
+
+    <div class="form-row">
+      <label>💡 Your Idea (natural language)</label>
+      <textarea id="idea" placeholder="e.g. a shiny red sports car, a medieval stone castle, a cute cartoon robot..."></textarea>
+    </div>
+
+    <div class="form-row">
+      <label>🤖 LLM Model (Ollama)</label>
+      <select id="model">
+        <option value="mistral:7b">mistral:7b — General (recommended)</option>
+        <option value="deepseek-coder:6.7b">deepseek-coder:6.7b</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label>🎨 SD Inference Steps <small style="color:var(--muted)">(more = better quality, slower)</small></label>
+      <div class="range-row">
+        <input type="range" id="steps" min="10" max="50" value="20" oninput="document.getElementById('steps-val').textContent=this.value">
+        <span class="range-val" id="steps-val">20</span>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>🔲 Mesh Resolution <small style="color:var(--muted)">(higher = finer, more RAM)</small></label>
+      <div class="range-row">
+        <input type="range" id="mc-res" min="128" max="512" step="64" value="256" oninput="document.getElementById('mcres-val').textContent=this.value">
+        <span class="range-val" id="mcres-val">256</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="checkbox-row">
+      <input type="checkbox" id="skip-llm">
+      <label for="skip-llm">⏭️ Skip LLM — use my text directly as SD prompt</label>
+    </div>
+
+    <div class="form-row" id="image-row" style="display:none">
+      <label>📁 Or use existing image path (skips SD)</label>
+      <input type="text" id="image-path" placeholder="/path/to/image.png">
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="use-image" onchange="document.getElementById('image-row').style.display=this.checked?'block':'none'">
+      <label for="use-image">🖼️ Use existing image (skip SD generation)</label>
+    </div>
+
+    <div class="divider"></div>
+
+    <button class="btn btn-primary" id="run-btn" onclick="runPipeline()">
+      <span>🚀</span> Generate 3D Model
+    </button>
+
+    <div style="margin-top: 10px; display:flex; gap:8px;">
+      <button class="btn btn-ghost" style="flex:1; font-size:0.8rem" onclick="generatePromptOnly()">
+        🧠 Preview LLM Prompt
+      </button>
+      <button class="btn btn-ghost" style="flex:1; font-size:0.8rem" onclick="loadOutputs()">
+        🖼️ Refresh Gallery
+      </button>
+    </div>
+  </div>
+
+  <!-- Right Panel: Status + Log -->
+  <div class="panel">
+    <div class="panel-title"><span>📡</span> Status &amp; Log</div>
+
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+      <span class="status-pill status-idle" id="status-pill">
+        <span class="dot" id="status-dot"></span>
+        <span id="status-text">Idle</span>
+      </span>
+      <span id="elapsed-text" style="font-size:0.75rem; color:var(--muted)"></span>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+
+    <div class="log-box" id="log-box">
+Waiting for pipeline to start...
+
+Pipeline stages:
+  1. 🧠 LLM (Ollama mistral:7b) → image prompt
+   2. 🎨 Stable Diffusion 1.5 (Apple MPS) → image
+  3. 🧊 TripoSR → 3D mesh (OBJ + GLB)
+
+First run will download:
+  • Stable Diffusion 1.5 base  ~4 GB
+  • TripoSR model               ~1 GB
+(cached on subsequent runs)
+    </div>
+
+    <div class="result-card" id="result-card">
+      <div class="result-title">✅ Pipeline Complete!</div>
+      <div id="result-links"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div style="font-size:0.75rem; color:var(--muted)">
+      <strong style="color:var(--text)">💡 After generating:</strong><br>
+      • Press <kbd style="background:var(--card);padding:1px 5px;border-radius:4px;border:1px solid var(--border)">Space</kbd> on .glb for Quick Look preview<br>
+      • Drag .obj into <strong>Blender</strong> for editing<br>
+      • Use <strong>Reality Composer</strong> for AR on Apple devices
+    </div>
+  </div>
+
+  <!-- Output Gallery -->
+  <div class="output-gallery">
+    <div class="panel-title"><span>🖼️</span> Generated Outputs</div>
+    <div class="gallery-grid" id="gallery-grid">
+      <div style="color:var(--muted);font-size:0.8rem;grid-column:1/-1">
+        No outputs yet. Run the pipeline to generate 3D models.
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+let currentJobId = null;
+let pollInterval = null;
+let startTime    = null;
+
+// ── Load Ollama models ────────────────────────────────────────
+async function loadModels() {
+  try {
+    const r = await fetch('/api/models');
+    const d = await r.json();
+    const sel = document.getElementById('model');
+    sel.innerHTML = '';
+    d.models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      if (m.includes('mistral')) opt.textContent += ' — General (recommended)';
+      sel.appendChild(opt);
+    });
+  } catch(e) {}
+}
+
+// ── Preview LLM Prompt ────────────────────────────────────────
+async function generatePromptOnly() {
+  const idea = document.getElementById('idea').value.trim();
+  if (!idea) { log('⚠️ Enter an idea first.', 'warning'); return; }
+  const model = document.getElementById('model').value;
+  log(`🧠 Asking ${model} to generate a prompt for: "${idea}"...`, 'info');
+  try {
+    const r = await fetch('/api/generate-prompt', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({idea, model})
+    });
+    const d = await r.json();
+    if (d.prompt) {
+      log(`✅ Generated SD prompt:\n   ${d.prompt}`, 'success');
+    } else {
+      log(`❌ Error: ${d.error}`, 'error');
+    }
+  } catch(e) {
+    log(`❌ Request failed: ${e.message}`, 'error');
+  }
+}
+
+// ── Run Full Pipeline ─────────────────────────────────────────
+async function runPipeline() {
+  const idea      = document.getElementById('idea').value.trim();
+  const imagePath = document.getElementById('image-path').value.trim();
+  const useImage  = document.getElementById('use-image').checked;
+
+  if (!idea && !useImage) { log('⚠️ Enter an idea!', 'warning'); return; }
+  if (useImage && !imagePath) { log('⚠️ Enter an image path!', 'warning'); return; }
+
+  const payload = {
+    idea:          idea || null,
+    image:         useImage ? imagePath : null,
+    model:         document.getElementById('model').value,
+    steps:         parseInt(document.getElementById('steps').value),
+    mc_resolution: parseInt(document.getElementById('mc-res').value),
+    skip_llm:      document.getElementById('skip-llm').checked
+  };
+
+  setStatus('running');
+  document.getElementById('run-btn').disabled = true;
+  document.getElementById('result-card').classList.remove('show');
+  clearLog();
+  setSteps('idle');
+  startTimer();
+
+  log(`🚀 Starting pipeline...`, 'info');
+  log(`   Idea: ${idea}`, 'info');
+  log(`   Model: ${payload.model}`, 'info');
+  log(`   SD Steps: ${payload.steps}  |  MC Res: ${payload.mc_resolution}`, 'info');
+
+  try {
+    const r = await fetch('/api/pipeline', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    if (d.job_id) {
+      currentJobId = d.job_id;
+      log(`\n📋 Job ID: ${d.job_id} — polling for status...`, 'info');
+      startPolling();
+    } else {
+      log(`❌ Failed to start: ${d.error}`, 'error');
+      setStatus('error');
+      document.getElementById('run-btn').disabled = false;
+    }
+  } catch(e) {
+    log(`❌ Request failed: ${e.message}`, 'error');
+    setStatus('error');
+    document.getElementById('run-btn').disabled = false;
+  }
+}
+
+// ── Polling ───────────────────────────────────────────────────
+let pollCount = 0;
+function startPolling() {
+  pollCount = 0;
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(pollJob, 3000);
+}
+
+async function pollJob() {
+  if (!currentJobId) return;
+  pollCount++;
+
+  // Simulate stage progression based on elapsed time
+  const elapsed = (Date.now() - startTime) / 1000;
+  if      (elapsed < 5)   setSteps(0);
+  else if (elapsed < 30)  setSteps(1);
+  else if (elapsed < 120) setSteps(2);
+  else                    setSteps(3);
+
+  try {
+    const r = await fetch(`/api/job/${currentJobId}`);
+    const d = await r.json();
+
+    if (d.status === 'done') {
+      clearInterval(pollInterval);
+      stopTimer();
+      setStatus('done');
+      setSteps(4);
+      log('\n✅ Pipeline complete!', 'success');
+      if (d.result) {
+        log(`📸 Image: ${d.result.image}`, 'success');
+        log(`🧊 OBJ:   ${d.result.obj}`, 'success');
+        log(`🔷 GLB:   ${d.result.glb}`, 'success');
+        showResult(d.result);
+      }
+      document.getElementById('run-btn').disabled = false;
+      loadOutputs();
+
+    } else if (d.status === 'error') {
+      clearInterval(pollInterval);
+      stopTimer();
+      setStatus('error');
+      log(`\n❌ Error: ${d.error}`, 'error');
+      document.getElementById('run-btn').disabled = false;
+
+    } else {
+      // Still running — show a heartbeat
+      if (pollCount % 4 === 0) {
+        const mins = Math.floor((Date.now()-startTime)/60000);
+        const secs = Math.floor(((Date.now()-startTime)%60000)/1000);
+        log(`⏳ Running... ${mins}m ${secs}s elapsed`, 'info');
+      }
+    }
+  } catch(e) {}
+}
+
+// ── UI Helpers ────────────────────────────────────────────────
+function log(msg, type='') {
+  const box = document.getElementById('log-box');
+  const cls = type ? `log-${type}` : '';
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = msg;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+function clearLog() {
+  document.getElementById('log-box').innerHTML = '';
+}
+
+function setStatus(state) {
+  const pill = document.getElementById('status-pill');
+  const dot  = document.getElementById('status-dot');
+  const txt  = document.getElementById('status-text');
+  const pb   = document.getElementById('progress-bar');
+  pill.className = `status-pill status-${state}`;
+  dot.className  = `dot${state === 'running' ? ' pulse' : ''}`;
+  const labels = {idle:'Idle', running:'Running…', done:'Complete', error:'Failed'};
+  txt.textContent = labels[state] || state;
+  if (state === 'running') { pb.classList.add('indeterminate'); pb.style.width = ''; }
+  else if (state === 'done')  { pb.classList.remove('indeterminate'); pb.style.width = '100%'; pb.style.background = 'var(--green)'; }
+  else if (state === 'error') { pb.classList.remove('indeterminate'); pb.style.width = '100%'; pb.style.background = 'var(--red)'; }
+  else { pb.classList.remove('indeterminate'); pb.style.width = '0'; pb.style.background = ''; }
+}
+
+function setSteps(stage) {
+  // stage = 0,1,2,3,4  or 'idle'
+  ['step1','step2','step3','step4'].forEach((id,i) => {
+    const el = document.getElementById(id);
+    el.className = 'step';
+    if (stage === 'idle') return;
+    if (i < stage)      el.classList.add('done');
+    else if (i === stage-1 || (stage===0 && i===0)) el.classList.add('active');
+  });
+}
+
+let timerInterval = null;
+function startTimer() {
+  startTime = Date.now();
+  timerInterval = setInterval(() => {
+    const sec = Math.floor((Date.now()-startTime)/1000);
+    document.getElementById('elapsed-text').textContent = `${Math.floor(sec/60)}m ${sec%60}s`;
+  }, 1000);
+}
+function stopTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+}
+
+function showResult(result) {
+  const card  = document.getElementById('result-card');
+  const links = document.getElementById('result-links');
+  links.innerHTML = '';
+  const items = [
+    {label:'📸 Image', path: result.image},
+    {label:'🧱 OBJ',   path: result.obj},
+    {label:'🔷 GLB',   path: result.glb},
+  ];
+  items.forEach(item => {
+    if (!item.path) return;
+    const a = document.createElement('div');
+    a.className = 'result-link';
+    a.innerHTML = `<strong>${item.label}</strong> <span style="color:var(--muted);font-size:0.75rem">${item.path}</span>`;
+    links.appendChild(a);
+  });
+  card.classList.add('show');
+}
+
+// ── Gallery ───────────────────────────────────────────────────
+async function loadOutputs() {
+  try {
+    const r = await fetch('/api/outputs');
+    const d = await r.json();
+    const grid = document.getElementById('gallery-grid');
+    grid.innerHTML = '';
+
+    if (!d.images.length && !d.meshes.length) {
+      grid.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;grid-column:1/-1">No outputs yet. Run the pipeline to generate 3D models.</div>';
+      return;
+    }
+
+    d.images.slice(0,12).forEach(path => {
+      const item = document.createElement('div');
+      item.className = 'gallery-item';
+      const fname = path.split('/').pop();
+      item.innerHTML = `
+        <img src="/${path}" alt="${fname}" onerror="this.style.display='none'">
+        <div class="item-info">
+          <span class="item-type type-img">PNG</span>${fname}
+        </div>`;
+      item.onclick = () => window.open(`/${path}`, '_blank');
+      grid.appendChild(item);
+    });
+
+    d.meshes.slice(0,12).forEach(path => {
+      const item = document.createElement('div');
+      item.className = 'gallery-item';
+      const fname = path.split('/').pop();
+      item.innerHTML = `
+        <div style="width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:2.5rem;background:var(--card)">🔷</div>
+        <div class="item-info">
+          <span class="item-type type-glb">GLB</span>${fname}
+        </div>`;
+      item.onclick = () => window.open(`/${path}`, '_blank');
+      grid.appendChild(item);
+    });
+  } catch(e) {}
+}
+
+// ── Init ──────────────────────────────────────────────────────
+loadModels();
+loadOutputs();
+</script>
+</body>
+</html>
