@@ -34,7 +34,7 @@ Run your own private AI assistant locally using **Ollama**, **Open WebUI**, and 
 
 ### Step 1 – Clone the repo
 ```bash
-git clone https://github.com/jup313/myllm.git
+git clone https://github.com/jup313/MYLLM.git
 cd myllm
 ```
 
