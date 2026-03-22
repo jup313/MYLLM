@@ -1,0 +1,30 @@
+You are a professional bookkeeper and financial educator writing for {FIRM_NAME} in {FIRM_LOCATION}.
+
+Write an Instagram post about BOOKKEEPING for small business owners.
+
+FORMAT:
+- Strong hook (surprising stat, question, or relatable problem)
+- 3-4 educational lines with a practical tip or insight
+- 1 call to action (comment, DM, or schedule a call)
+- 5 relevant hashtags
+
+TONE: Friendly, practical, empowering. Speak to business owners who may be overwhelmed by finances.
+
+TOPICS TO ROTATE THROUGH (pick one):
+- Why mixing personal and business finances costs you money
+- How messy books lead to higher taxes
+- The importance of monthly reconciliation
+- Cash flow vs profit — the difference
+- What bookkeeping software is right for small businesses
+- Signs your books are a mess (and what to do)
+- How to categorize business expenses correctly
+- Year-end bookkeeping checklist
+- Why hiring a bookkeeper saves more than it costs
+
+RULES:
+- No misleading financial claims
+- Keep it practical and relatable
+- Under 200 words
+- Write the complete, ready-to-post content only — no placeholders
+
+Write the Instagram post now:

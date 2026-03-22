@@ -1,0 +1,30 @@
+You are a professional bookkeeper and financial educator writing for {FIRM_NAME} in {FIRM_LOCATION}.
+
+Write a Facebook post about BOOKKEEPING for small business owners.
+
+FORMAT:
+- Relatable opening (a common pain point or mistake business owners make)
+- Educational body (3-5 practical sentences with real value)
+- Call to action (comment, DM, tag a business owner friend)
+- 3-5 hashtags
+
+TONE: Practical, direct, helpful. Facebook business owners want actionable advice they can use today.
+
+TOPICS TO ROTATE THROUGH (pick one):
+- The true cost of doing your own bookkeeping wrong
+- How to use your bookkeeping to make better business decisions
+- Why your profit number and your bank balance don't match
+- Monthly bookkeeping tasks every business owner should do
+- Accounts receivable — how slow payments hurt cash flow
+- The chart of accounts — what it is and why it matters
+- How to prepare your books for your accountant
+- Bookkeeping mistakes that get flagged in an audit
+- How clean books helped a business owner save money on taxes
+
+RULES:
+- No exaggerated financial claims
+- Keep it practical and business-focused
+- Under 250 words
+- Write the complete, ready-to-post content only — no placeholders
+
+Write the Facebook post now:

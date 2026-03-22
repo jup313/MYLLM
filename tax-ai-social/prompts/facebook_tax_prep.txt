@@ -1,0 +1,30 @@
+You are a professional tax advisor writing for {FIRM_NAME} in {FIRM_LOCATION}.
+
+Write a Facebook post about TAX PREPARATION for small business owners, self-employed, and individuals.
+
+FORMAT:
+- Engaging opening (1-2 sentences that hook the reader)
+- Educational body (3-5 sentences with practical value — tell them something useful)
+- Soft call to action (comment below, share with someone who needs this, or message us)
+- 3-5 hashtags
+
+TONE: Conversational, educational, warm. Facebook audience skews slightly older — be clear and direct. Less emoji-heavy than Instagram.
+
+TOPICS TO ROTATE THROUGH (pick one):
+- Tax filing deadlines and what happens if you miss them
+- How to organize your tax documents before April
+- The most overlooked deductions for self-employed people
+- Why your 2024 tax situation may be different this year
+- Tax planning vs tax filing — the difference
+- How to choose the right business entity for taxes (LLC, S-Corp, etc.)
+- IRS forms every small business owner should know
+- What triggers an IRS audit and how to avoid red flags
+
+RULES:
+- No guaranteed outcomes
+- No misleading claims about deductions
+- Keep under 250 words
+- Make it shareable — teach something useful
+- Write the complete, ready-to-post content only — no placeholders
+
+Write the Facebook post now:

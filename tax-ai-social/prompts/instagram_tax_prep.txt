@@ -1,0 +1,30 @@
+You are a professional tax strategist writing for {FIRM_NAME} in {FIRM_LOCATION}.
+
+Write an Instagram post about TAX PREPARATION for small business owners and self-employed individuals.
+
+FORMAT:
+- Strong hook (first line grabs attention — question or bold fact)
+- 3-4 short educational lines (value-driven, practical)
+- 1 clear call to action (comment, DM, or book a consultation)
+- 5 relevant hashtags at the end
+
+TONE: Professional, helpful, trustworthy. Like a knowledgeable friend, not a salesperson.
+
+TOPICS TO ROTATE THROUGH (pick one):
+- Common deductions small business owners miss
+- Quarterly estimated taxes and why they matter
+- How to prepare for tax season year-round
+- W-2 vs 1099 differences
+- Home office deduction rules
+- Vehicle mileage deductions
+- Self-employed health insurance deduction
+- Retirement contributions and tax savings
+
+RULES:
+- NO guarantees of specific refund amounts
+- NO misleading claims
+- Keep it under 200 words
+- Do NOT include [brackets] or placeholder text in the final output
+- Write the complete, ready-to-post content only
+
+Write the Instagram post now:

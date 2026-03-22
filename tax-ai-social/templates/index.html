@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tax AI Social Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f1117; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .header { background: #1a1d27; border-bottom: 1px solid #2d3148; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .header h1 { font-size: 20px; font-weight: 700; color: #fff; }
+  .header h1 span { color: #6366f1; }
+  .status-bar { display: flex; gap: 16px; font-size: 13px; }
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .dot-green { background: #22c55e; }
+  .dot-red { background: #ef4444; }
+  .dot-yellow { background: #eab308; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: #1a1d27; border: 1px solid #2d3148; border-radius: 10px; padding: 16px; text-align: center; }
+  .stat-card .num { font-size: 28px; font-weight: 700; }
+  .stat-card .label { font-size: 12px; color: #94a3b8; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-card.draft .num { color: #6366f1; }
+  .stat-card.posted .num { color: #22c55e; }
+  .stat-card.rejected .num { color: #ef4444; }
+  .stat-card.failed .num { color: #f97316; }
+  .stat-card.total .num { color: #e2e8f0; }
+  .actions-bar { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: center; }
+  .btn { padding: 9px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.15s; }
+  .btn-primary { background: #6366f1; color: #fff; }
+  .btn-primary:hover { background: #5254cc; }
+  .btn-success { background: #22c55e; color: #fff; }
+  .btn-success:hover { background: #16a34a; }
+  .btn-danger { background: #ef4444; color: #fff; }
+  .btn-danger:hover { background: #dc2626; }
+  .btn-ghost { background: #2d3148; color: #e2e8f0; }
+  .btn-ghost:hover { background: #3d4262; }
+  .btn-sm { padding: 6px 12px; font-size: 13px; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .filter-tabs { display: flex; gap: 4px; background: #1a1d27; border: 1px solid #2d3148; border-radius: 8px; padding: 4px; }
+  .filter-tab { padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; background: transparent; color: #94a3b8; transition: all 0.15s; }
+  .filter-tab.active { background: #6366f1; color: #fff; }
+  .posts-list { display: flex; flex-direction: column; gap: 12px; }
+  .post-card { background: #1a1d27; border: 1px solid #2d3148; border-radius: 12px; padding: 18px; }
+  .post-card:hover { border-color: #4a4f78; }
+  .post-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+  .badge-instagram { background: #7c3aed22; color: #a78bfa; border: 1px solid #7c3aed44; }
+  .badge-facebook { background: #1d4ed822; color: #60a5fa; border: 1px solid #1d4ed844; }
+  .badge-tiktok { background: #be185d22; color: #f472b6; border: 1px solid #be185d44; }
+  .badge-draft { background: #6366f122; color: #818cf8; border: 1px solid #6366f144; }
+  .badge-posted { background: #15803d22; color: #4ade80; border: 1px solid #15803d44; }
+  .badge-rejected { background: #dc262622; color: #f87171; border: 1px solid #dc262644; }
+  .badge-failed { background: #ea580c22; color: #fb923c; border: 1px solid #ea580c44; }
+  .badge-approved { background: #0d9488 22; color: #2dd4bf; border: 1px solid #0d948844; }
+  .post-meta { font-size: 12px; color: #64748b; margin-left: auto; }
+  .compliance-icon { font-size: 14px; }
+  .post-content { font-size: 14px; line-height: 1.6; color: #cbd5e1; background: #0f1117; border-radius: 8px; padding: 14px; white-space: pre-wrap; word-break: break-word; max-height: 180px; overflow-y: auto; }
+  .post-content.expanded { max-height: none; }
+  .post-content::-webkit-scrollbar { width: 4px; }
+  .post-content::-webkit-scrollbar-track { background: #1a1d27; }
+  .post-content::-webkit-scrollbar-thumb { background: #4a4f78; border-radius: 2px; }
+  .post-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+  .expand-btn { background: none; border: none; color: #6366f1; font-size: 12px; cursor: pointer; padding: 0; margin-left: auto; }
+  .edit-area { width: 100%; background: #0f1117; color: #e2e8f0; border: 1px solid #4a4f78; border-radius: 8px; padding: 12px; font-size: 14px; line-height: 1.6; resize: vertical; min-height: 120px; margin-top: 8px; font-family: inherit; }
+  .edit-area:focus { outline: none; border-color: #6366f1; }
+  .generate-panel { background: #1a1d27; border: 1px solid #2d3148; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+  .generate-panel h3 { font-size: 15px; font-weight: 600; margin-bottom: 14px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+  .generate-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  select { background: #0f1117; color: #e2e8f0; border: 1px solid #2d3148; border-radius: 8px; padding: 8px 12px; font-size: 14px; cursor: pointer; }
+  select:focus { outline: none; border-color: #6366f1; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1d27; border: 1px solid #2d3148; border-radius: 10px; padding: 14px 20px; font-size: 14px; z-index: 1000; max-width: 360px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); animation: slideIn 0.2s ease; }
+  .toast.success { border-color: #22c55e44; }
+  .toast.error { border-color: #ef444444; }
+  @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .loading { text-align: center; padding: 40px; color: #64748b; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #2d3148; border-top-color: #6366f1; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty-state { text-align: center; padding: 60px 20px; color: #64748b; }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .schedule-info { background: #1a1d27; border: 1px solid #2d3148; border-radius: 10px; padding: 14px 18px; display: flex; gap: 20px; font-size: 13px; color: #94a3b8; flex-wrap: wrap; }
+  .schedule-info strong { color: #e2e8f0; }
+  .reject-reason { padding: 8px 12px; border-radius: 6px; border: 1px solid #2d3148; background: #0f1117; color: #e2e8f0; font-size: 13px; width: 200px; }
+  .settings-panel { background: #1a1d27; border: 1px solid #2d3148; border-radius: 12px; padding: 24px; margin-bottom: 24px; display: none; }
+  .settings-panel h3 { font-size: 15px; font-weight: 600; margin-bottom: 18px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .settings-section { margin-bottom: 20px; }
+  .settings-section h4 { font-size: 12px; font-weight: 700; color: #6366f1; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid #2d3148; }
+  .field-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+  .field-group label { font-size: 12px; color: #94a3b8; font-weight: 500; }
+  .field-group input, .field-group select { background: #0f1117; color: #e2e8f0; border: 1px solid #2d3148; border-radius: 8px; padding: 8px 12px; font-size: 14px; width: 100%; }
+  .field-group input:focus, .field-group select:focus { outline: none; border-color: #6366f1; }
+  .settings-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid #2d3148; }
+  .nav-tabs { display: flex; gap: 2px; margin-bottom: 24px; border-bottom: 1px solid #2d3148; }
+  .nav-tab { padding: 10px 20px; border: none; background: transparent; color: #94a3b8; font-size: 14px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+  .nav-tab.active { color: #6366f1; border-bottom-color: #6366f1; }
+  .nav-tab:hover { color: #e2e8f0; }
+  .page { display: none; }
+  .page.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🤖 Tax AI <span>Social</span> Dashboard</h1>
+  <div class="status-bar" id="statusBar">
+    <span><span class="status-dot dot-yellow"></span>Loading...</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Nav Tabs -->
+  <div class="nav-tabs" style="margin-top:20px">
+    <button class="nav-tab active" onclick="switchPage('posts', this)">📋 Posts</button>
+    <button class="nav-tab" onclick="switchPage('settings', this)">⚙️ Business Settings</button>
+  </div>
+
+  <!-- POSTS PAGE -->
+  <div class="page active" id="page-posts">
+
+  <!-- Stats -->
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-card draft"><div class="num" id="statDraft">-</div><div class="label">Drafts</div></div>
+    <div class="stat-card posted"><div class="num" id="statPosted">-</div><div class="label">Posted</div></div>
+    <div class="stat-card rejected"><div class="num" id="statRejected">-</div><div class="label">Rejected</div></div>
+    <div class="stat-card failed"><div class="num" id="statFailed">-</div><div class="label">Failed</div></div>
+    <div class="stat-card total"><div class="num" id="statTotal">-</div><div class="label">Total</div></div>
+  </div>
+
+  <!-- Schedule Info -->
+  <div class="schedule-info" id="scheduleInfo" style="margin-bottom:20px">
+    <span>⏰ Schedule: <strong id="scheduleTime">Loading...</strong></span>
+    <span>📅 Next run: <strong id="nextRun">Loading...</strong></span>
+    <span>🤖 Ollama: <strong id="ollamaStatus">Checking...</strong></span>
+    <span>🔗 Meta API: <strong id="metaStatus">Checking...</strong></span>
+  </div>
+
+  <!-- Generate Panel -->
+  <div class="generate-panel">
+    <h3>⚡ Generate Now</h3>
+    <div class="generate-form">
+      <select id="genPlatform">
+        <option value="instagram">Instagram</option>
+        <option value="facebook">Facebook</option>
+        <option value="tiktok">TikTok Script</option>
+      </select>
+      <select id="genSpecialty">
+        <option value="tax_prep">Tax Preparation</option>
+        <option value="tax_resolution">Tax Resolution</option>
+        <option value="bookkeeping">Bookkeeping</option>
+      </select>
+      <button class="btn btn-primary" onclick="generateOne()">Generate Post</button>
+      <button class="btn btn-ghost" onclick="generateBatch()" id="batchBtn">🚀 Generate Today's Batch (5 posts)</button>
+    </div>
+  </div>
+
+  <!-- Actions Bar -->
+  <div class="actions-bar">
+    <div class="filter-tabs">
+      <button class="filter-tab active" onclick="filterPosts('all', this)">All</button>
+      <button class="filter-tab" onclick="filterPosts('draft', this)">Drafts</button>
+      <button class="filter-tab" onclick="filterPosts('posted', this)">Posted</button>
+      <button class="filter-tab" onclick="filterPosts('rejected', this)">Rejected</button>
+      <button class="filter-tab" onclick="filterPosts('failed', this)">Failed</button>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="loadPosts()">🔄 Refresh</button>
+  </div>
+
+  <!-- Posts List -->
+  <div class="posts-list" id="postsList">
+    <div class="loading"><span class="spinner"></span>Loading posts...</div>
+  </div>
+
+  </div><!-- end page-posts -->
+
+  <!-- SETTINGS PAGE -->
+  <div class="page" id="page-settings">
+    <div style="background:#1a1d27;border:1px solid #2d3148;border-radius:12px;padding:28px;">
+      <h3 style="font-size:16px;font-weight:700;margin-bottom:24px;color:#e2e8f0">⚙️ Business Settings</h3>
+
+      <!-- Business Info -->
+      <div class="settings-section">
+        <h4>🏢 Business Information</h4>
+        <div class="settings-grid">
+          <div class="field-group">
+            <label>Business / Firm Name</label>
+            <input type="text" id="s_FIRM_NAME" placeholder="JP Services PSL">
+          </div>
+          <div class="field-group">
+            <label>Location (City, State)</label>
+            <input type="text" id="s_FIRM_LOCATION" placeholder="Port Saint Lucie, FL">
+          </div>
+          <div class="field-group">
+            <label>Services Offered</label>
+            <input type="text" id="s_FIRM_SERVICES" placeholder="tax preparation, tax resolution, bookkeeping">
+          </div>
+          <div class="field-group">
+            <label>Target Audience</label>
+            <input type="text" id="s_FIRM_AUDIENCE" placeholder="small business owners, self-employed">
+          </div>
+        </div>
+      </div>
+
+      <!-- Contact Info -->
+      <div class="settings-section">
+        <h4>📞 Contact Information (Auto-appended to every post)</h4>
+        <div class="settings-grid">
+          <div class="field-group">
+            <label>Phone Number</label>
+            <input type="text" id="s_FIRM_PHONE" placeholder="(772) 555-0000">
+          </div>
+          <div class="field-group">
+            <label>WhatsApp Number</label>
+            <input type="text" id="s_FIRM_WHATSAPP" placeholder="(772) 555-0000">
+          </div>
+          <div class="field-group">
+            <label>Email Address</label>
+            <input type="text" id="s_FIRM_EMAIL" placeholder="info@yourfirm.com">
+          </div>
+          <div class="field-group">
+            <label>Website</label>
+            <input type="text" id="s_FIRM_WEBSITE" placeholder="www.yourfirm.com">
+          </div>
+          <div class="field-group">
+            <label>Address</label>
+            <input type="text" id="s_FIRM_ADDRESS" placeholder="Port Saint Lucie, FL">
+          </div>
+          <div class="field-group">
+            <label>Fax (optional)</label>
+            <input type="text" id="s_FIRM_FAX" placeholder="Leave blank if none">
+          </div>
+          <div class="field-group">
+            <label>Instagram Handle</label>
+            <input type="text" id="s_FIRM_INSTAGRAM" placeholder="@yourhandle">
+          </div>
+          <div class="field-group">
+            <label>Facebook Page Name</label>
+            <input type="text" id="s_FIRM_FACEBOOK" placeholder="Your Business Name">
+          </div>
+        </div>
+        <div class="field-group" style="margin-top:8px">
+          <label>Include Contact Block on Posts?</label>
+          <select id="s_INCLUDE_CONTACT_BLOCK">
+            <option value="true">✅ Yes — auto-append contact info to every post</option>
+            <option value="false">❌ No — skip contact block</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Meta API -->
+      <div class="settings-section">
+        <h4>🔗 Meta (Facebook/Instagram) API</h4>
+        <div class="settings-grid">
+          <div class="field-group">
+            <label>Facebook Page ID</label>
+            <input type="text" id="s_PAGE_ID" placeholder="your_page_id">
+          </div>
+          <div class="field-group">
+            <label>Page Access Token</label>
+            <input type="password" id="s_PAGE_ACCESS_TOKEN" placeholder="your_long_lived_token">
+          </div>
+          <div class="field-group">
+            <label>Instagram Business Account ID</label>
+            <input type="text" id="s_INSTAGRAM_ACCOUNT_ID" placeholder="your_ig_account_id">
+          </div>
+        </div>
+      </div>
+
+      <!-- Schedule -->
+      <div class="settings-section">
+        <h4>⏰ Generation Schedule</h4>
+        <div class="settings-grid">
+          <div class="field-group">
+            <label>Hour (24h format, e.g. 6 = 6 AM)</label>
+            <input type="number" id="s_SCHEDULE_HOUR" min="0" max="23" placeholder="6">
+          </div>
+          <div class="field-group">
+            <label>Minute (0–59)</label>
+            <input type="number" id="s_SCHEDULE_MINUTE" min="0" max="59" placeholder="0">
+          </div>
+          <div class="field-group">
+            <label>Ollama Model</label>
+            <input type="text" id="s_OLLAMA_MODEL" placeholder="mistral:7b">
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-footer">
+        <button class="btn btn-ghost" onclick="loadSettings()">↺ Reset</button>
+        <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+      </div>
+    </div>
+  </div><!-- end page-settings -->
+
+</div><!-- end container -->
+
+<script>
+let allPosts = [];
+let currentFilter = 'all';
+
+async function loadStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    document.getElementById('scheduleTime').textContent = d.schedule || '-';
+    document.getElementById('nextRun').textContent = d.next_generation ? d.next_generation.split('.')[0] : '-';
+    document.getElementById('ollamaStatus').textContent = d.ollama?.running ? '✅ Running' : '❌ Not running';
+    document.getElementById('metaStatus').textContent = d.meta_api?.configured ? '✅ Configured' : '⚠️ Not set';
+    if (d.stats) {
+      document.getElementById('statDraft').textContent = d.stats.draft || 0;
+      document.getElementById('statPosted').textContent = d.stats.posted || 0;
+      document.getElementById('statRejected').textContent = d.stats.rejected || 0;
+      document.getElementById('statFailed').textContent = d.stats.failed || 0;
+      document.getElementById('statTotal').textContent = d.stats.total || 0;
+    }
+    const issues = d.meta_api?.issues || [];
+    document.getElementById('statusBar').innerHTML = `
+      <span><span class="status-dot ${d.ollama?.running ? 'dot-green' : 'dot-red'}"></span>Ollama ${d.ollama?.running ? 'ON' : 'OFF'}</span>
+      <span><span class="status-dot ${d.meta_api?.configured ? 'dot-green' : 'dot-yellow'}"></span>Meta API</span>
+      <span><span class="status-dot dot-green"></span>Dashboard Live</span>
+    `;
+  } catch(e) {
+    document.getElementById('statusBar').innerHTML = '<span><span class="status-dot dot-red"></span>Connection error</span>';
+  }
+}
+
+async function loadPosts() {
+  try {
+    const r = await fetch('/api/posts');
+    allPosts = await r.json();
+    renderPosts();
+  } catch(e) {
+    document.getElementById('postsList').innerHTML = '<div class="loading" style="color:#ef4444">Failed to load posts</div>';
+  }
+}
+
+function filterPosts(filter, el) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderPosts();
+}
+
+function renderPosts() {
+  const list = document.getElementById('postsList');
+  let posts = allPosts;
+  if (currentFilter !== 'all') posts = allPosts.filter(p => p.status === currentFilter);
+  
+  if (posts.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">📭</div><div>No ${currentFilter === 'all' ? '' : currentFilter + ' '}posts yet</div><div style="font-size:13px;margin-top:8px">Generate some posts above!</div></div>`;
+    return;
+  }
+
+  list.innerHTML = posts.map(p => `
+    <div class="post-card" id="card-${p.id}">
+      <div class="post-header">
+        <span class="badge badge-${p.platform}">${p.platform === 'tiktok' ? '🎵 TikTok' : p.platform === 'instagram' ? '📸 Instagram' : '👥 Facebook'}</span>
+        <span class="badge badge-${p.status}">${p.status.toUpperCase()}</span>
+        <span style="font-size:12px;color:#94a3b8">${p.specialty?.replace('_',' ')}</span>
+        ${p.compliance_passed ? '<span class="compliance-icon" title="Compliance passed">✅</span>' : '<span class="compliance-icon" title="Compliance failed">⚠️</span>'}
+        <span class="post-meta">#${p.id} · ${p.created_at ? p.created_at.substring(0,16) : ''}</span>
+      </div>
+      <div class="post-content" id="content-${p.id}">${escHtml(p.content)}</div>
+      ${p.status === 'draft' ? `
+        <textarea class="edit-area" id="edit-${p.id}" style="display:none">${escHtml(p.content)}</textarea>
+        <div class="post-actions">
+          <button class="btn btn-success btn-sm" onclick="approvePost(${p.id})">✅ Approve & Post</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggleEdit(${p.id})">✏️ Edit</button>
+          <button class="btn btn-ghost btn-sm" id="saveBtn-${p.id}" style="display:none" onclick="saveEdit(${p.id})">💾 Save</button>
+          <input class="reject-reason" id="reason-${p.id}" type="text" placeholder="Reject reason (optional)">
+          <button class="btn btn-danger btn-sm" onclick="rejectPost(${p.id})">❌ Reject</button>
+          <button class="expand-btn" onclick="toggleExpand(${p.id})">Show more</button>
+        </div>
+      ` : `
+        <div class="post-actions">
+          ${p.meta_post_id ? `<span style="font-size:12px;color:#4ade80">Posted ID: ${p.meta_post_id}</span>` : ''}
+          ${p.reject_reason ? `<span style="font-size:12px;color:#f87171">Reason: ${escHtml(p.reject_reason)}</span>` : ''}
+          <button class="expand-btn" onclick="toggleExpand(${p.id})">Show more</button>
+        </div>
+      `}
+    </div>
+  `).join('');
+}
+
+function escHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toggleExpand(id) {
+  const el = document.getElementById('content-'+id);
+  el.classList.toggle('expanded');
+  const btn = el.closest('.post-card').querySelector('.expand-btn');
+  btn.textContent = el.classList.contains('expanded') ? 'Show less' : 'Show more';
+}
+
+function toggleEdit(id) {
+  const content = document.getElementById('content-'+id);
+  const edit = document.getElementById('edit-'+id);
+  const saveBtn = document.getElementById('saveBtn-'+id);
+  if (edit.style.display === 'none') {
+    content.style.display = 'none';
+    edit.style.display = 'block';
+    saveBtn.style.display = 'inline-block';
+  } else {
+    content.style.display = 'block';
+    edit.style.display = 'none';
+    saveBtn.style.display = 'none';
+  }
+}
+
+async function saveEdit(id) {
+  const content = document.getElementById('edit-'+id).value;
+  const r = await fetch(`/api/posts/${id}/edit`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({content})
+  });
+  const d = await r.json();
+  if (d.success) {
+    showToast('✅ Post updated', 'success');
+    loadPosts();
+  } else {
+    showToast('❌ ' + (d.error || 'Failed'), 'error');
+  }
+}
+
+async function approvePost(id) {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '⏳ Posting...';
+  const r = await fetch(`/api/posts/${id}/approve`, {method:'POST'});
+  const d = await r.json();
+  if (d.success) {
+    showToast('✅ ' + d.message, 'success');
+  } else {
+    showToast('⚠️ ' + d.message, 'error');
+  }
+  loadPosts();
+  loadStatus();
+}
+
+async function rejectPost(id) {
+  const reason = document.getElementById('reason-'+id)?.value || '';
+  const r = await fetch(`/api/posts/${id}/reject`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({reason})
+  });
+  const d = await r.json();
+  if (d.success) {
+    showToast('Post rejected', 'success');
+    loadPosts();
+    loadStatus();
+  }
+}
+
+async function generateOne() {
+  const platform = document.getElementById('genPlatform').value;
+  const specialty = document.getElementById('genSpecialty').value;
+  showToast(`⏳ Generating ${platform}/${specialty}...`);
+  const r = await fetch('/api/generate', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({platform, specialty})
+  });
+  const d = await r.json();
+  if (d.success) {
+    showToast('✅ Post generated! Check Drafts.', 'success');
+    filterPosts('draft', document.querySelectorAll('.filter-tab')[1]);
+    loadPosts();
+    loadStatus();
+  } else {
+    showToast('❌ ' + (d.error || 'Generation failed'), 'error');
+  }
+}
+
+async function generateBatch() {
+  const btn = document.getElementById('batchBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating 5 posts...';
+  showToast('⏳ Generating daily batch (may take 2-3 min)...');
+  const r = await fetch('/api/generate/batch', {method:'POST'});
+  const d = await r.json();
+  btn.disabled = false;
+  btn.textContent = '🚀 Generate Today\'s Batch (5 posts)';
+  if (d.success) {
+    showToast(`✅ ${d.generated} posts generated!`, 'success');
+    filterPosts('draft', document.querySelectorAll('.filter-tab')[1]);
+    loadPosts();
+    loadStatus();
+  } else {
+    showToast('❌ Batch failed: ' + (d.error || ''), 'error');
+  }
+}
+
+function showToast(msg, type = '') {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+}
+
+// ── Page switching ──
+function switchPage(page, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  el.classList.add('active');
+  if (page === 'settings') loadSettings();
+}
+
+// ── Settings ──
+async function loadSettings() {
+  try {
+    const r = await fetch('/api/settings');
+    const d = await r.json();
+    for (const [key, val] of Object.entries(d)) {
+      const el = document.getElementById('s_' + key);
+      if (el) {
+        if (el.tagName === 'SELECT') {
+          el.value = val;
+        } else {
+          el.value = val;
+        }
+      }
+    }
+  } catch(e) {
+    showToast('❌ Failed to load settings', 'error');
+  }
+}
+
+async function saveSettings() {
+  const fields = [
+    'FIRM_NAME','FIRM_LOCATION','FIRM_SERVICES','FIRM_AUDIENCE',
+    'FIRM_PHONE','FIRM_EMAIL','FIRM_WHATSAPP','FIRM_WEBSITE',
+    'FIRM_ADDRESS','FIRM_FAX','FIRM_INSTAGRAM','FIRM_FACEBOOK',
+    'INCLUDE_CONTACT_BLOCK',
+    'PAGE_ID','PAGE_ACCESS_TOKEN','INSTAGRAM_ACCOUNT_ID',
+    'SCHEDULE_HOUR','SCHEDULE_MINUTE','OLLAMA_MODEL'
+  ];
+  const data = {};
+  fields.forEach(f => {
+    const el = document.getElementById('s_' + f);
+    if (el) data[f] = el.value;
+  });
+  try {
+    const r = await fetch('/api/settings', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    const d = await r.json();
+    if (d.success) {
+      showToast('✅ Settings saved!', 'success');
+      loadStatus();
+    } else {
+      showToast('❌ ' + (d.error || 'Save failed'), 'error');
+    }
+  } catch(e) {
+    showToast('❌ Network error', 'error');
+  }
+}
+
+// Init
+loadStatus();
+loadPosts();
+setInterval(loadStatus, 30000);
+</script>
+</body>
+</html>
