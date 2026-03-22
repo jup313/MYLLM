@@ -15,6 +15,7 @@ Run a complete private AI ecosystem locally using **Ollama**, **Open WebUI**, an
 | 📬 **Gmail AI Manager** | AI email triage, summarize, draft replies | :5051 |
 | 🧊 **TripoSR 3D Pipeline** | Image → 3D mesh (Apple Silicon) | :5050 |
 | 🤖 **Tax AI Social** ⭐ NEW | AI social media content engine for tax/accounting firms | :5055 |
+| 🎙️ **Whisper STT** ⭐ NEW | 100% local speech-to-text for Open WebUI | :9000 |
 
 ---
 
@@ -255,20 +256,26 @@ MYLLM/
 ├── triposr-pipeline/             # Image → 3D mesh pipeline
 │   ├── architecture.svg          # Full stack diagram
 │   └── ...
-└── tax-ai-social/                # ⭐ Tax AI Social Media Engine
-    ├── app/
-    │   ├── main.py               # Flask API + routes
-    │   ├── generator.py          # Post generation engine
-    │   ├── compliance.py         # 35+ tax compliance rules
-    │   ├── poster.py             # Meta Graph API posting
-    │   ├── scheduler.py          # 6 AM daily auto-generation
-    │   └── database.py           # SQLite post tracking
-    ├── prompts/                  # 7 platform-specific prompts
-    ├── templates/index.html      # Dark-mode dashboard
-    ├── .env.example              # Config template
+├── tax-ai-social/                # ⭐ Tax AI Social Media Engine
+│   ├── app/
+│   │   ├── main.py               # Flask API + routes
+│   │   ├── generator.py          # Post generation engine
+│   │   ├── compliance.py         # 35+ tax compliance rules
+│   │   ├── poster.py             # Meta Graph API posting
+│   │   ├── scheduler.py          # 6 AM daily auto-generation
+│   │   └── database.py           # SQLite post tracking
+│   ├── prompts/                  # 7 platform-specific prompts
+│   ├── templates/index.html      # Dark-mode dashboard
+│   ├── .env.example              # Config template
+│   ├── requirements.txt
+│   ├── setup.sh
+│   └── start.sh
+└── whisper-stt/                  # ⭐ Local Voice / Speech-to-Text
+    ├── server.py                 # OpenAI-compatible STT API
     ├── requirements.txt
     ├── setup.sh
-    └── start.sh
+    ├── start.sh
+    └── README.md
 ```
 
 ---
@@ -310,13 +317,53 @@ Everything runs **100% locally**:
 
 ---
 
+## 🎙️ Tool 6 — Whisper STT ⭐ NEW
+
+**100% local speech-to-text for Open WebUI — talk to your AI instead of typing.**
+
+```bash
+cd whisper-stt
+bash start.sh
+# Server starts at http://localhost:9000
+```
+
+First run downloads the Whisper `small` model (~460 MB, one time).
+
+### Connect to Open WebUI
+1. Open **http://localhost:3000**
+2. Profile icon → **Settings** → **Audio**
+3. Speech to Text:
+   - Engine: **OpenAI API**
+   - Base URL: `http://localhost:9000/v1`
+   - API Key: `local`
+4. Save — click the **🎤 microphone** in chat to speak!
+
+### Model options
+| Model | Size | Speed | Best For |
+|-------|------|-------|----------|
+| `tiny` | ~75 MB | ~0.3s | Quick testing |
+| `base` | ~145 MB | ~0.5s | English-only |
+| `small` | ~460 MB | ~1s | **Recommended ✅** |
+| `medium` | ~1.5 GB | ~3s | Best accuracy |
+
+```bash
+WHISPER_MODEL=medium bash start.sh   # Use a larger model
+```
+
+- ✅ 100% private — audio never leaves your Mac
+- ✅ Works offline after first setup
+- ✅ Multi-language support (auto-detects)
+- ✅ OpenAI-compatible API format
+
+---
+
 ## 🗺️ Roadmap
 
 - [ ] Stable Diffusion image generation for social posts
 - [ ] LinkedIn support for Tax AI Social
 - [ ] Quant AI portfolio tracker dashboard
 - [ ] Gmail AI calendar integration
-- [ ] Voice interface for Open WebUI
+- [x] ~~Voice interface for Open WebUI~~ — ✅ Done! (Whisper STT)
 
 ---
 
