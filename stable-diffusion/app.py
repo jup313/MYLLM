@@ -92,14 +92,14 @@ def _load_pipeline(model_id: str):
             variant="fp16" if device == "cuda" else None,
             use_safetensors=True,
         )
-        # ── MPS fix: SDXL VAE decode on MPS produces black/NaN images with float16.
-        # enable_sequential_cpu_offload() routes UNet on MPS and VAE decode on CPU,
-        # completely avoiding the black image bug while keeping GPU acceleration.
+        # ── MPS fix: SDXL on MPS produces black images at any resolution due to NaN
+        # in the VAE decoder.  Running entirely on CPU (float32) is the only fully
+        # reliable option on Apple Silicon — still fast via Accelerate/ANE.
         if device == "mps":
-            pipe.enable_sequential_cpu_offload()
-            log.info("🍎 MPS: sequential_cpu_offload enabled to prevent black image bug")
+            pipe = pipe.to("cpu")
+            log.info("🍎 MPS: pipeline running on CPU (float32) to prevent black image bug at all resolutions")
         elif device == "cuda":
-            pipe.to(device)
+            pipe = pipe.to(device)
             pipe.enable_model_cpu_offload()
         else:
             pipe = pipe.to(device)
