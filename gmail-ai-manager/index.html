@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📬 Gmail AI Manager</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f172a;--surface:#1e293b;--surface2:#263348;--border:#334155;
+    --text:#e2e8f0;--muted:#94a3b8;--dim:#64748b;
+    --green:#4ade80;--blue:#60a5fa;--purple:#a78bfa;
+    --red:#f87171;--yellow:#fbbf24;--orange:#fb923c;
+    --teal:#2dd4bf;
+  }
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+  /* Layout */
+  #app{display:flex;min-height:100vh}
+  #sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);padding:0;flex-shrink:0;display:flex;flex-direction:column}
+  #main{flex:1;overflow:auto;padding:28px}
+  /* Sidebar */
+  .sidebar-logo{padding:20px 16px;border-bottom:1px solid var(--border)}
+  .sidebar-logo h1{font-size:18px;color:var(--green);font-weight:700}
+  .sidebar-logo p{font-size:11px;color:var(--dim);margin-top:2px}
+  .sidebar-nav{padding:12px 0;flex:1}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;color:var(--muted);font-size:14px;border-left:3px solid transparent;transition:.15s}
+  .nav-item:hover{color:var(--text);background:var(--surface2)}
+  .nav-item.active{color:var(--green);border-left-color:var(--green);background:rgba(74,222,128,.07)}
+  .nav-item .badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700}
+  .sidebar-status{padding:12px 16px;border-top:1px solid var(--border);font-size:12px}
+  .status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px}
+  .status-dot.green{background:var(--green)}
+  .status-dot.red{background:var(--red)}
+  .status-dot.yellow{background:var(--yellow)}
+  /* Cards */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+  .card-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  /* Buttons */
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:.15s}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn-green{background:#166534;color:var(--green);border:1px solid #166534}
+  .btn-green:hover:not(:disabled){background:#15803d}
+  .btn-blue{background:#1d4ed8;color:#bfdbfe;border:1px solid #1d4ed8}
+  .btn-blue:hover:not(:disabled){background:#2563eb}
+  .btn-red{background:#7f1d1d;color:var(--red);border:1px solid #7f1d1d}
+  .btn-red:hover:not(:disabled){background:#991b1b}
+  .btn-gray{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+  .btn-gray:hover:not(:disabled){color:var(--text);background:var(--border)}
+  .btn-sm{padding:5px 10px;font-size:12px}
+  /* Form */
+  .form-group{margin-bottom:16px}
+  .form-group label{display:block;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+  .form-group input,.form-group select,.form-group textarea{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-size:14px;outline:none;transition:.15s}
+  .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(96,165,250,.15)}
+  .form-group input::placeholder{color:var(--dim)}
+  .form-group .hint{font-size:11px;color:var(--dim);margin-top:4px}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  /* Toggle */
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+  .toggle-row:last-child{border-bottom:none}
+  .toggle-label{font-size:14px;color:var(--text)}
+  .toggle-hint{font-size:11px;color:var(--dim);margin-top:2px}
+  .toggle{position:relative;width:40px;height:22px;flex-shrink:0}
+  .toggle input{opacity:0;width:0;height:0}
+  .toggle-slider{position:absolute;inset:0;background:var(--border);border-radius:22px;cursor:pointer;transition:.2s}
+  .toggle-slider:before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+  .toggle input:checked + .toggle-slider{background:var(--green)}
+  .toggle input:checked + .toggle-slider:before{transform:translateX(18px)}
+  /* Tables */
+  .table-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;color:var(--dim);font-weight:500;font-size:11px;text-transform:uppercase;padding:8px 12px;border-bottom:1px solid var(--border)}
+  td{padding:10px 12px;border-bottom:1px solid rgba(51,65,85,.5);color:var(--muted);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  /* Badge/Pills */
+  .pill{display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:600}
+  .pill-spam{background:rgba(107,114,128,.15);color:#9ca3af}
+  .pill-marketing{background:rgba(251,191,36,.1);color:var(--yellow)}
+  .pill-work{background:rgba(96,165,250,.1);color:var(--blue)}
+  .pill-urgent{background:rgba(248,113,113,.1);color:var(--red)}
+  .pill-personal{background:rgba(167,139,250,.1);color:var(--purple)}
+  .pill-notification{background:rgba(45,212,191,.1);color:var(--teal)}
+  /* Alerts */
+  .alert{padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:16px}
+  .alert-info{background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.2);color:#93c5fd}
+  .alert-warn{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2);color:var(--yellow)}
+  .alert-success{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);color:var(--green)}
+  .alert-error{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);color:var(--red)}
+  /* Stats grid */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
+  .stat-number{font-size:28px;font-weight:700;margin-bottom:2px}
+  .stat-label{font-size:12px;color:var(--dim)}
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto}
+  .modal-header{padding:20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .modal-body{padding:20px}
+  .modal-footer{padding:16px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
+  .close-btn{background:none;border:none;color:var(--dim);cursor:pointer;font-size:20px;padding:2px 8px;border-radius:4px}
+  .close-btn:hover{color:var(--text);background:var(--surface2)}
+  /* Section headers */
+  .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+  .page-title{font-size:22px;font-weight:700;color:var(--text)}
+  .page-subtitle{font-size:13px;color:var(--dim);margin-top:2px}
+  /* Setup wizard */
+  .wizard-steps{display:flex;gap:0;margin-bottom:28px}
+  .wizard-step{flex:1;padding:10px;text-align:center;font-size:12px;color:var(--dim);border-bottom:2px solid var(--border);transition:.2s}
+  .wizard-step.active{color:var(--green);border-bottom-color:var(--green);font-weight:600}
+  .wizard-step.done{color:var(--teal);border-bottom-color:var(--teal)}
+  .step-content{display:none}
+  .step-content.active{display:block}
+  /* Misc */
+  .divider{height:1px;background:var(--border);margin:20px 0}
+  .text-green{color:var(--green)}
+  .text-red{color:var(--red)}
+  .text-muted{color:var(--muted)}
+  .text-dim{color:var(--dim)}
+  .mono{font-family:monospace;font-size:12px;background:var(--bg);padding:2px 6px;border-radius:4px}
+  .empty-state{text-align:center;padding:40px 20px;color:var(--dim)}
+  .empty-state .icon{font-size:40px;margin-bottom:12px}
+  .spin{animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .truncate{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px}
+  pre{background:var(--bg);padding:12px;border-radius:8px;font-size:12px;white-space:pre-wrap;color:var(--muted);border:1px solid var(--border);max-height:200px;overflow-y:auto}
+  textarea.draft{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:8px;font-size:13px;line-height:1.6;resize:vertical;min-height:120px}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="sidebar-logo">
+    <h1>📬 Gmail AI</h1>
+    <p>Local LLM Email Manager</p>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-item active" onclick="showPage('setup')" id="nav-setup">⚙️ Setup</div>
+    <div class="nav-item" onclick="showPage('inbox')" id="nav-inbox">📥 Inbox</div>
+    <div class="nav-item" onclick="showPage('queue')" id="nav-queue">⏳ Approval Queue <span class="badge" id="queue-badge" style="display:none">0</span></div>
+    <div class="nav-item" onclick="showPage('summaries')" id="nav-summaries">📊 Summaries</div>
+    <div class="nav-item" onclick="showPage('logs')" id="nav-logs">📋 Logs</div>
+    <div class="nav-item" onclick="showPage('settings')" id="nav-settings">🔧 Settings</div>
+  </nav>
+  <div class="sidebar-status" id="sidebar-status">
+    <div id="status-ollama"><span class="status-dot yellow"></span>Checking Ollama...</div>
+    <div id="status-gmail" style="margin-top:6px"><span class="status-dot yellow"></span>Checking Gmail...</div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div id="main">
+
+  <!-- ══ SETUP PAGE ══ -->
+  <div id="page-setup" class="page active">
+    <div class="page-header">
+      <div><div class="page-title">⚙️ Setup</div><div class="page-subtitle">Configure Gmail AI Manager — all credentials stay local</div></div>
+    </div>
+    <div id="setup-complete-banner" class="alert alert-success" style="display:none">
+      ✅ <strong>Setup complete!</strong> Gmail AI Manager is ready. Go to <strong>Inbox</strong> to run the pipeline.
+    </div>
+
+    <div class="wizard-steps">
+      <div class="wizard-step active" id="wstep-1">1. Google API</div>
+      <div class="wizard-step" id="wstep-2">2. LLM Settings</div>
+      <div class="wizard-step" id="wstep-3">3. Behavior</div>
+      <div class="wizard-step" id="wstep-4">4. Connect Gmail</div>
+    </div>
+
+    <!-- Step 1: Google API -->
+    <div class="step-content active" id="step-1">
+      <div class="card">
+        <div class="card-title">🔑 Google Cloud API Credentials</div>
+        <div class="alert alert-info">
+          <strong>How to get credentials:</strong><br>
+          1. Go to <a href="https://console.cloud.google.com" target="_blank" style="color:var(--blue)">console.cloud.google.com</a><br>
+          2. Create a project → <strong>Enable Gmail API</strong><br>
+          3. APIs &amp; Services → Credentials → <strong>Create OAuth 2.0 Client ID</strong> (Desktop app)<br>
+          4. Download JSON → copy Client ID &amp; Client Secret below
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Gmail Address</label>
+            <input type="email" id="gmail_address" placeholder="you@gmail.com">
+            <div class="hint">The Gmail account to manage</div>
+          </div>
+          <div class="form-group">
+            <label>Google OAuth Client ID</label>
+            <input type="text" id="gmail_client_id" placeholder="xxx.apps.googleusercontent.com">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Google OAuth Client Secret</label>
+          <input type="password" id="gmail_client_secret" placeholder="GOCSPX-...">
+          <div class="hint">Stored locally only — never sent anywhere</div>
+        </div>
+        <div style="display:flex;justify-content:flex-end">
+          <button class="btn btn-blue" onclick="nextStep(2)">Next: LLM Settings →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: LLM -->
+    <div class="step-content" id="step-2">
+      <div class="card">
+        <div class="card-title">🧠 Local LLM (Ollama)</div>
+        <div class="alert alert-info">
+          Make sure <strong>Ollama</strong> is running: <span class="mono">ollama serve</span><br>
+          Recommended models: <span class="mono">mistral:7b</span> · <span class="mono">llama3:8b</span> · <span class="mono">deepseek-coder:6.7b</span>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Ollama URL</label>
+            <input type="text" id="ollama_url" value="http://localhost:11434">
+          </div>
+          <div class="form-group">
+            <label>Model</label>
+            <input type="text" id="ollama_model" placeholder="mistral:7b" list="model-list">
+            <datalist id="model-list">
+              <option value="mistral:7b">
+              <option value="llama3:8b">
+              <option value="deepseek-coder:6.7b">
+              <option value="gemma:7b">
+              <option value="qwen:7b">
+            </datalist>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+          <button class="btn btn-gray btn-sm" onclick="testOllama()">🔍 Test Connection</button>
+          <span id="ollama-test-result" style="font-size:13px"></span>
+        </div>
+        <div id="ollama-models-list" style="margin-bottom:16px;display:none">
+          <div style="font-size:12px;color:var(--dim);margin-bottom:6px">Available models on your Ollama:</div>
+          <div id="ollama-model-tags"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <button class="btn btn-gray" onclick="nextStep(1)">← Back</button>
+          <button class="btn btn-blue" onclick="nextStep(3)">Next: Behavior →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Behavior -->
+    <div class="step-content" id="step-3">
+      <div class="card">
+        <div class="card-title">🤖 Automation Behavior</div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Auto-trash spam</div><div class="toggle-hint">Automatically trash high-confidence spam (≥90%)</div></div>
+          <label class="toggle"><input type="checkbox" id="auto_archive_spam" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Auto-unsubscribe marketing</div><div class="toggle-hint">Use List-Unsubscribe headers only (safe RFC standard)</div></div>
+          <label class="toggle"><input type="checkbox" id="auto_unsubscribe"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Require approval for all actions</div><div class="toggle-hint">Queue everything for manual review (recommended)</div></div>
+          <label class="toggle"><input type="checkbox" id="require_approval" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Daily summary report</div><div class="toggle-hint">Generate daily digest of your inbox</div></div>
+          <label class="toggle"><input type="checkbox" id="daily_summary" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Weekly summary report</div><div class="toggle-hint">Generate weekly aggregate report</div></div>
+          <label class="toggle"><input type="checkbox" id="weekly_summary"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="divider"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Auto-action confidence threshold</label>
+            <input type="number" id="auto_threshold" value="0.90" min="0.5" max="1.0" step="0.05">
+            <div class="hint">Only auto-act on emails with confidence above this (0.90 = 90%)</div>
+          </div>
+          <div class="form-group">
+            <label>Max auto-actions per run</label>
+            <input type="number" id="rate_limit_per_run" value="10" min="1" max="50">
+            <div class="hint">Safety limit on automatic actions per pipeline run</div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <button class="btn btn-gray" onclick="nextStep(2)">← Back</button>
+          <button class="btn btn-blue" onclick="saveSetupAndNext()">Save &amp; Connect Gmail →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: Connect Gmail -->
+    <div class="step-content" id="step-4">
+      <div class="card">
+        <div class="card-title">🔐 Connect Gmail</div>
+        <div id="auth-status-box">
+          <div class="alert alert-info" id="auth-not-connected">
+            Click <strong>Connect Gmail</strong> to start the OAuth2 flow.<br>
+            A browser window will open for Google sign-in. Grant the requested permissions.
+          </div>
+          <div class="alert alert-success" id="auth-connected" style="display:none">
+            ✅ Gmail connected successfully!
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-green" onclick="startAuth()" id="auth-btn">🔗 Connect Gmail</button>
+          <button class="btn btn-gray btn-sm" onclick="checkAuthStatus()">🔄 Check Status</button>
+          <span id="auth-result" style="font-size:13px"></span>
+        </div>
+        <div class="divider"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <button class="btn btn-gray" onclick="nextStep(3)">← Back</button>
+          <button class="btn btn-green" onclick="finishSetup()" id="finish-btn">✅ Finish Setup</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ INBOX PAGE ══ -->
+  <div id="page-inbox" class="page" style="display:none">
+    <div class="page-header">
+      <div><div class="page-title">📥 Inbox</div><div class="page-subtitle">Classified emails from Gmail</div></div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <select id="inbox-filter" class="form-group" style="margin:0;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:8px;font-size:13px">
+          <option value="">All categories</option>
+          <option value="urgent">🚨 Urgent</option>
+          <option value="work">💼 Work</option>
+          <option value="personal">👤 Personal</option>
+          <option value="marketing">📣 Marketing</option>
+          <option value="spam">🗑️ Spam</option>
+          <option value="notification">🔔 Notification</option>
+        </select>
+        <button class="btn btn-green" onclick="runPipeline()" id="pipeline-btn">▶ Run Pipeline</button>
+      </div>
+    </div>
+
+    <div id="pipeline-status-bar" class="alert alert-info" style="display:none">
+      <span class="spin">⏳</span> Pipeline running — fetching and classifying emails...
+    </div>
+    <div id="pipeline-result" style="display:none" class="alert alert-success"></div>
+
+    <div class="stats-grid" id="inbox-stats"></div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Category</th><th>Subject</th><th>From</th>
+            <th>Confidence</th><th>Suggested Action</th><th>Date</th><th></th>
+          </tr></thead>
+          <tbody id="inbox-table">
+            <tr><td colspan="7" class="empty-state"><div class="icon">📭</div><div>No emails yet — run the pipeline to fetch &amp; classify</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ APPROVAL QUEUE ══ -->
+  <div id="page-queue" class="page" style="display:none">
+    <div class="page-header">
+      <div><div class="page-title">⏳ Approval Queue</div><div class="page-subtitle">Review and approve/reject AI-suggested actions</div></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-gray btn-sm" onclick="loadQueue()">🔄 Refresh</button>
+        <button class="btn btn-red btn-sm" onclick="bulkReject()">✗ Reject All</button>
+        <button class="btn btn-green btn-sm" onclick="bulkApprove()">✓ Approve All Safe</button>
+      </div>
+    </div>
+    <div id="queue-empty" class="empty-state" style="display:none">
+      <div class="icon">✅</div><div>Queue is empty — nothing pending</div>
+    </div>
+    <div id="queue-list"></div>
+  </div>
+
+  <!-- ══ SUMMARIES ══ -->
+  <div id="page-summaries" class="page" style="display:none">
+    <div class="page-header">
+      <div><div class="page-title">📊 Summaries</div><div class="page-subtitle">Daily &amp; weekly email digest reports</div></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-blue btn-sm" onclick="generateSummary('daily')">📬 Generate Daily</button>
+        <button class="btn btn-blue btn-sm" onclick="generateSummary('weekly')">📊 Generate Weekly</button>
+      </div>
+    </div>
+    <div id="summaries-list"></div>
+    <div id="summary-viewer" style="display:none">
+      <button class="btn btn-gray btn-sm" style="margin-bottom:12px" onclick="closeSummaryViewer()">← Back to list</button>
+      <div class="card" style="padding:0;overflow:hidden">
+        <iframe id="summary-iframe" style="width:100%;min-height:600px;border:none;background:#0f172a"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ LOGS ══ -->
+  <div id="page-logs" class="page" style="display:none">
+    <div class="page-header">
+      <div><div class="page-title">📋 Audit Log</div><div class="page-subtitle">All actions taken by the system</div></div>
+      <button class="btn btn-gray btn-sm" onclick="loadLogs()">🔄 Refresh</button>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Time</th><th>Email ID</th><th>Action</th><th>Result</th><th>Details</th></tr></thead>
+          <tbody id="logs-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SETTINGS ══ -->
+  <div id="page-settings" class="page" style="display:none">
+    <div class="page-header">
+      <div><div class="page-title">🔧 Settings</div><div class="page-subtitle">Update configuration</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🧠 LLM Configuration</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Ollama URL</label>
+          <input type="text" id="s_ollama_url" placeholder="http://localhost:11434">
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <input type="text" id="s_ollama_model" placeholder="mistral:7b">
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">⚙️ Automation Settings</div>
+      <div class="toggle-row">
+        <div><div class="toggle-label">Auto-trash spam</div><div class="toggle-hint">High-confidence spam is auto-trashed</div></div>
+        <label class="toggle"><input type="checkbox" id="s_auto_archive_spam"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="toggle-label">Auto-unsubscribe marketing</div></div>
+        <label class="toggle"><input type="checkbox" id="s_auto_unsubscribe"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="toggle-label">Require approval for all actions</div></div>
+        <label class="toggle"><input type="checkbox" id="s_require_approval"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="form-row" style="margin-top:14px">
+        <div class="form-group">
+          <label>Confidence threshold</label>
+          <input type="number" id="s_auto_threshold" min="0.5" max="1.0" step="0.05">
+        </div>
+        <div class="form-group">
+          <label>Rate limit (per run)</label>
+          <input type="number" id="s_rate_limit_per_run" min="1" max="50">
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">🔐 Gmail Account</div>
+      <div id="settings-auth-status" class="alert alert-info"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-blue btn-sm" onclick="startAuth()">🔗 Re-connect Gmail</button>
+        <button class="btn btn-red btn-sm" onclick="revokeAuth()">🗑️ Disconnect Gmail</button>
+      </div>
+    </div>
+    <button class="btn btn-green" onclick="saveSettings()">💾 Save Settings</button>
+    <span id="settings-saved" style="margin-left:12px;font-size:13px;color:var(--green);display:none">✅ Saved</span>
+  </div>
+
+</div><!-- end #main -->
+</div><!-- end #app -->
+
+<!-- EMAIL DETAIL MODAL -->
+<div class="modal-overlay" id="email-modal" style="display:none" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <div style="font-size:16px;font-weight:600" id="modal-subject"></div>
+        <div style="font-size:12px;color:var(--dim);margin-top:3px" id="modal-from"></div>
+      </div>
+      <button class="close-btn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-classification"></div>
+      <div class="divider"></div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.7;max-height:200px;overflow-y:auto" id="modal-body"></div>
+      <div id="modal-draft-section" style="display:none">
+        <div class="divider"></div>
+        <div style="font-size:12px;color:var(--dim);margin-bottom:8px;text-transform:uppercase;font-weight:600">✍️ AI Draft Reply</div>
+        <textarea class="draft" id="modal-draft-text"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-green btn-sm" onclick="sendDraftFromModal()">📤 Send Reply</button>
+          <button class="btn btn-blue btn-sm" onclick="saveDraftToGmail()">💾 Save as Draft in Gmail</button>
+          <button class="btn btn-gray btn-sm" onclick="regenerateDraft()">🔄 Regenerate</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" id="modal-actions"></div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let currentEmailId = null;
+let currentActionId = null;
+
+// ─── Navigation ────────────────────────────────────────────────────
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).style.display = 'block';
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'inbox') { loadInboxStats(); loadInbox(); }
+  if (name === 'queue') loadQueue();
+  if (name === 'summaries') loadSummaries();
+  if (name === 'logs') loadLogs();
+  if (name === 'settings') loadSettings();
+}
+
+// ─── Status polling ────────────────────────────────────────────────
+
+async function checkStatus() {
+  try {
+    const r = await fetch(API + '/api/status');
+    const d = await r.json();
+    const ollamaEl = document.getElementById('status-ollama');
+    const gmailEl  = document.getElementById('status-gmail');
+    ollamaEl.innerHTML = d.ollama_running
+      ? `<span class="status-dot green"></span>Ollama: ${d.config.ollama_model || 'connected'}`
+      : `<span class="status-dot red"></span>Ollama: offline`;
+    gmailEl.innerHTML = d.authenticated
+      ? `<span class="status-dot green"></span>Gmail: connected`
+      : `<span class="status-dot red"></span>Gmail: not connected`;
+    // Load pending count
+    const ar = await fetch(API + '/api/actions');
+    const ad = await ar.json();
+    const badge = document.getElementById('queue-badge');
+    if (ad.count > 0) { badge.textContent = ad.count; badge.style.display = ''; }
+    else badge.style.display = 'none';
+    // Show/hide setup banner
+    if (d.configured && d.authenticated) {
+      document.getElementById('setup-complete-banner').style.display = 'block';
+    }
+    // Pre-fill setup if config exists
+    if (d.config) {
+      const cfg = d.config;
+      if (cfg.gmail_address) document.getElementById('gmail_address').value = cfg.gmail_address;
+      if (cfg.gmail_client_id) document.getElementById('gmail_client_id').value = cfg.gmail_client_id;
+      if (cfg.ollama_url) document.getElementById('ollama_url').value = cfg.ollama_url;
+      if (cfg.ollama_model) document.getElementById('ollama_model').value = cfg.ollama_model;
+    }
+  } catch(e) {}
+}
+setInterval(checkStatus, 10000);
+checkStatus();
+
+// ─── Setup Wizard ──────────────────────────────────────────────────
+
+function nextStep(n) {
+  document.querySelectorAll('.step-content').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.wizard-step').forEach((s,i) => {
+    s.classList.remove('active','done');
+    if (i < n-1) s.classList.add('done');
+    if (i === n-1) s.classList.add('active');
+  });
+  document.getElementById('step-' + n).classList.add('active');
+}
+
+async function testOllama() {
+  const url   = document.getElementById('ollama_url').value;
+  const resEl = document.getElementById('ollama-test-result');
+  resEl.textContent = '⏳ Testing...';
+  try {
+    const r = await fetch('/api/llm/models');
+    const d = await r.json();
+    if (d.running) {
+      resEl.innerHTML = `<span class="text-green">✅ Connected! ${d.models.length} model(s) found</span>`;
+      const tagsEl = document.getElementById('ollama-model-tags');
+      tagsEl.innerHTML = d.models.map(m => `<span class="pill pill-work" style="margin:2px;cursor:pointer" onclick="document.getElementById('ollama_model').value='${m}'">${m}</span>`).join('');
+      document.getElementById('ollama-models-list').style.display = 'block';
+    } else {
+      resEl.innerHTML = `<span class="text-red">❌ Cannot connect to Ollama</span>`;
+    }
+  } catch(e) {
+    resEl.innerHTML = `<span class="text-red">❌ Error: ${e.message}</span>`;
+  }
+}
+
+async function saveSetupAndNext() {
+  const data = {
+    gmail_address:      document.getElementById('gmail_address').value,
+    gmail_client_id:    document.getElementById('gmail_client_id').value,
+    gmail_client_secret: document.getElementById('gmail_client_secret').value,
+    ollama_url:         document.getElementById('ollama_url').value,
+    ollama_model:       document.getElementById('ollama_model').value,
+    auto_archive_spam:  document.getElementById('auto_archive_spam').checked ? 'true' : 'false',
+    auto_unsubscribe:   document.getElementById('auto_unsubscribe').checked ? 'true' : 'false',
+    require_approval:   document.getElementById('require_approval').checked ? 'true' : 'false',
+    daily_summary:      document.getElementById('daily_summary').checked ? 'true' : 'false',
+    weekly_summary:     document.getElementById('weekly_summary').checked ? 'true' : 'false',
+    auto_threshold:     document.getElementById('auto_threshold').value,
+    rate_limit_per_run: document.getElementById('rate_limit_per_run').value,
+  };
+  const r = await fetch('/api/setup', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)});
+  const d = await r.json();
+  if (d.success) nextStep(4);
+  else alert('Error: ' + d.error);
+}
+
+async function startAuth() {
+  const r = await fetch('/api/auth/start');
+  const d = await r.json();
+  if (d.success) {
+    window.open(d.auth_url, '_blank', 'width=600,height=700');
+    document.getElementById('auth-result').innerHTML = `<span class="text-muted">↗️ Browser opened — complete sign-in then click "Check Status"</span>`;
+  } else {
+    alert('Error: ' + d.error);
+  }
+}
+
+async function checkAuthStatus() {
+  const r = await fetch('/api/auth/status');
+  const d = await r.json();
+  if (d.authenticated) {
+    document.getElementById('auth-not-connected').style.display = 'none';
+    document.getElementById('auth-connected').style.display = 'block';
+    document.getElementById('auth-result').innerHTML = '<span class="text-green">✅ Gmail connected!</span>';
+  } else {
+    document.getElementById('auth-result').innerHTML = '<span class="text-red">❌ Not connected yet</span>';
+  }
+}
+
+function finishSetup() {
+  checkStatus();
+  showPage('inbox');
+}
+
+// ─── Inbox ─────────────────────────────────────────────────────────
+
+async function loadInboxStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const d = await r.json();
+    const grid = document.getElementById('inbox-stats');
+    const cats = d.by_category || {};
+    const icons = {urgent:'🚨',work:'💼',personal:'👤',marketing:'📣',spam:'🗑️',notification:'🔔'};
+    const colors = {urgent:'var(--red)',work:'var(--blue)',personal:'var(--purple)',marketing:'var(--yellow)',spam:'var(--dim)',notification:'var(--teal)'};
+    let html = `<div class="stat-card"><div class="stat-number text-green">${d.total_emails||0}</div><div class="stat-label">Total Emails</div></div>
+                <div class="stat-card"><div class="stat-number" style="color:var(--yellow)">${d.pending_actions||0}</div><div class="stat-label">Pending Actions</div></div>`;
+    for(const [cat,count] of Object.entries(cats)) {
+      html += `<div class="stat-card"><div class="stat-number" style="color:${colors[cat]||'var(--text)'}">${count}</div><div class="stat-label">${icons[cat]||'📧'} ${cat}</div></div>`;
+    }
+    grid.innerHTML = html;
+  } catch(e) {}
+}
+
+async function loadInbox() {
+  const cat = document.getElementById('inbox-filter').value;
+  let url = '/api/emails?limit=100';
+  if (cat) url += '&category=' + cat;
+  try {
+    const r = await fetch(url);
+    const d = await r.json();
+    const tbody = document.getElementById('inbox-table');
+    if (!d.emails || d.emails.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">📭</div><div>No emails yet — run the pipeline to fetch &amp; classify</div></div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.emails.map(e => {
+      const cat   = e.category || 'notification';
+      const pill  = `<span class="pill pill-${cat}">${catIcon(cat)} ${cat}</span>`;
+      const conf  = e.confidence ? `${Math.round(e.confidence*100)}%` : '—';
+      const date  = e.date ? e.date.substring(0,10) : '—';
+      const action = e.llm_action || '—';
+      return `<tr>
+        <td>${pill}</td>
+        <td><div class="truncate" style="max-width:280px;color:var(--text)">${esc(e.subject||'(no subject)')}</div></td>
+        <td><div class="truncate" style="max-width:180px">${esc(e.sender||e.sender_email||'?')}</div></td>
+        <td><span style="color:${confColor(e.confidence)}">${conf}</span></td>
+        <td><span style="font-size:12px">${actionIcon(action)} ${action}</span></td>
+        <td style="font-size:12px">${date}</td>
+        <td><button class="btn btn-gray btn-sm" onclick="openEmail('${e.id}')">View</button></td>
+      </tr>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+document.getElementById('inbox-filter').addEventListener('change', loadInbox);
+
+async function runPipeline() {
+  const btn = document.getElementById('pipeline-btn');
+  const bar = document.getElementById('pipeline-status-bar');
+  const res = document.getElementById('pipeline-result');
+  btn.disabled = true;
+  bar.style.display = 'block';
+  res.style.display = 'none';
+  try {
+    const r = await fetch('/api/pipeline/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({max_emails:30})});
+    const d = await r.json();
+    if (!d.success) { bar.style.display='none'; btn.disabled=false; alert(d.error); return; }
+    // Poll
+    const poll = setInterval(async () => {
+      const pr = await fetch('/api/pipeline/status');
+      const pd = await pr.json();
+      if (!pd.running) {
+        clearInterval(poll);
+        bar.style.display = 'none';
+        btn.disabled = false;
+        if (pd.error) {
+          res.className='alert alert-error'; res.style.display='block';
+          res.textContent = '❌ Pipeline error: ' + pd.error;
+        } else {
+          const s = pd.stats || {};
+          res.className='alert alert-success'; res.style.display='block';
+          res.innerHTML = `✅ Pipeline complete! Fetched: <b>${s.fetched||0}</b> · Classified: <b>${s.classified||0}</b> · Auto-trashed: <b>${s.auto_trashed||0}</b> · Queued: <b>${s.queued_for_approval||0}</b>`;
+        }
+        loadInbox(); loadInboxStats(); checkStatus();
+      }
+    }, 2000);
+  } catch(e) { bar.style.display='none'; btn.disabled=false; alert(e); }
+}
+
+// ─── Email Modal ────────────────────────────────────────────────────
+
+async function openEmail(id) {
+  currentEmailId = id;
+  const r = await fetch('/api/emails/' + id);
+  const e = await r.json();
+  document.getElementById('modal-subject').textContent = e.subject || '(no subject)';
+  document.getElementById('modal-from').textContent = (e.sender||'') + ' · ' + (e.sender_email||'') + ' · ' + (e.date||'').substring(0,16);
+  const cat = e.category || 'notification';
+  const conf = e.confidence ? `${Math.round(e.confidence*100)}%` : '—';
+  document.getElementById('modal-classification').innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:13px">
+      <span class="pill pill-${cat}">${catIcon(cat)} ${cat}</span>
+      <span style="color:var(--dim)">Confidence: <b style="color:${confColor(e.confidence)}">${conf}</b></span>
+      <span style="color:var(--dim)">Action: <b>${actionIcon(e.llm_action)} ${e.llm_action||'—'}</b></span>
+      ${e.unsubscribe_url ? `<span style="color:var(--yellow)">🔗 Has unsubscribe link</span>` : ''}
+    </div>`;
+  document.getElementById('modal-body').textContent = e.body || e.snippet || '(no body)';
+  // Draft section
+  const draftSection = document.getElementById('modal-draft-section');
+  if (e.draft_reply) {
+    draftSection.style.display = 'block';
+    document.getElementById('modal-draft-text').value = e.draft_reply;
+  } else {
+    draftSection.style.display = 'none';
+  }
+  // Action buttons
+  document.getElementById('modal-actions').innerHTML = `
+    <button class="btn btn-gray btn-sm" onclick="closeModal()">Close</button>
+    <button class="btn btn-gray btn-sm" onclick="archiveEmail('${id}')">📦 Archive</button>
+    <button class="btn btn-red btn-sm" onclick="trashEmail('${id}')">🗑️ Trash</button>
+    ${!e.draft_reply ? `<button class="btn btn-blue btn-sm" onclick="generateDraftForEmail('${id}')">✍️ Generate Draft Reply</button>` : ''}
+  `;
+  document.getElementById('email-modal').style.display = 'flex';
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('email-modal')) {
+    document.getElementById('email-modal').style.display = 'none';
+    currentEmailId = null;
+  }
+}
+
+async function regenerateDraft() {
+  if (!currentEmailId) return;
+  const r = await fetch(`/api/emails/${currentEmailId}/draft`, {method:'POST'});
+  const d = await r.json();
+  if (d.success) document.getElementById('modal-draft-text').value = d.draft_reply;
+}
+
+async function generateDraftForEmail(id) {
+  const r = await fetch(`/api/emails/${id}/draft`, {method:'POST'});
+  const d = await r.json();
+  if (d.success) {
+    document.getElementById('modal-draft-section').style.display = 'block';
+    document.getElementById('modal-draft-text').value = d.draft_reply;
+  }
+}
+
+async function sendDraftFromModal() {
+  if (!currentEmailId) return;
+  const body = document.getElementById('modal-draft-text').value;
+  if (!confirm('Send this reply?')) return;
+  const r = await fetch(`/api/actions`, {method:'GET'});
+  const actions = (await r.json()).actions || [];
+  const action = actions.find(a => a.email_id === currentEmailId);
+  if (action) {
+    await fetch(`/api/actions/${action.id}/approve`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({body, action_type:'send_reply'})});
+    closeModal();
+    loadQueue();
+  } else {
+    alert('No pending action found. Archive or queue it first.');
+  }
+}
+
+async function saveDraftToGmail() {
+  if (!currentEmailId) return;
+  const body = document.getElementById('modal-draft-text').value;
+  const r = await fetch(`/api/actions`, {method:'GET'});
+  const actions = (await r.json()).actions || [];
+  const action = actions.find(a => a.email_id === currentEmailId);
+  if (action) {
+    await fetch(`/api/actions/${action.id}/approve`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({body, action_type:'draft_reply'})});
+    alert('✅ Draft saved to Gmail');
+    closeModal();
+    loadQueue();
+  } else {
+    alert('No pending action found.');
+  }
+}
+
+async function archiveEmail(id) {
+  await fetch(`/api/actions`, {method:'GET'});
+  alert('⏳ Archive action queued. Check Approval Queue.');
+  closeModal();
+}
+
+async function trashEmail(id) {
+  if (!confirm('Move to trash?')) return;
+  alert('⏳ Trash action queued. Check Approval Queue.');
+  closeModal();
+}
+
+// ─── Approval Queue ─────────────────────────────────────────────────
+
+async function loadQueue() {
+  const r = await fetch('/api/actions');
+  const d = await r.json();
+  const list = document.getElementById('queue-list');
+  const empty = document.getElementById('queue-empty');
+  const badge = document.getElementById('queue-badge');
+  if (!d.actions || d.actions.length === 0) {
+    empty.style.display = 'block'; list.innerHTML = '';
+    badge.style.display = 'none'; return;
+  }
+  empty.style.display = 'none';
+  badge.textContent = d.count; badge.style.display = '';
+  list.innerHTML = d.actions.map(a => {
+    const cat  = a.category || 'notification';
+    const icon = actionIcon(a.action_type);
+    return `<div class="card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+            <span class="pill pill-${cat}">${catIcon(cat)} ${cat}</span>
+            <span style="font-size:12px;color:var(--dim)">${icon} Suggested: <b>${a.action_type}</b></span>
+            <span style="font-size:11px;color:var(--dim)">${(a.created_at||'').substring(0,16)}</span>
+          </div>
+          <div style="font-weight:600;color:var(--text);margin-bottom:2px">${esc(a.subject||'(no subject)')}</div>
+          <div style="font-size:12px;color:var(--muted)">${esc(a.sender||'')} &lt;${esc(a.sender_email||'')}&gt;</div>
+          ${a.notes ? `<div style="font-size:11px;color:var(--dim);margin-top:4px">💬 ${esc(a.notes)}</div>` : ''}
+          ${a.draft_reply ? `<div style="margin-top:10px"><div style="font-size:11px;color:var(--dim);margin-bottom:4px">✍️ AI DRAFT REPLY:</div><textarea class="draft" id="draft-${a.id}" style="min-height:80px">${esc(a.draft_reply)}</textarea></div>` : ''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+          <button class="btn btn-green btn-sm" onclick="approveAction(${a.id}, '${a.action_type}', '${a.email_id}')">✅ Approve</button>
+          ${a.draft_reply ? `<button class="btn btn-blue btn-sm" onclick="approveActionWithDraft(${a.id}, '${a.email_id}')">📤 Send Reply</button>` : ''}
+          <button class="btn btn-gray btn-sm" onclick="openEmail('${a.email_id}')">👁 View</button>
+          <button class="btn btn-red btn-sm" onclick="rejectAction(${a.id})">✗ Skip</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function approveAction(id, type, emailId) {
+  const r = await fetch(`/api/actions/${id}/approve`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({})});
+  const d = await r.json();
+  if (d.success) showToast('✅ ' + type + ' completed');
+  else showToast('❌ ' + d.message, true);
+  loadQueue(); loadInboxStats();
+}
+
+async function approveActionWithDraft(id, emailId) {
+  const draftEl = document.getElementById('draft-' + id);
+  const body = draftEl ? draftEl.value : '';
+  const r = await fetch(`/api/actions/${id}/approve`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({body, action_type:'send_reply'})});
+  const d = await r.json();
+  if (d.success) showToast('✅ Reply sent');
+  else showToast('❌ ' + d.message, true);
+  loadQueue();
+}
+
+async function rejectAction(id) {
+  await fetch(`/api/actions/${id}/reject`, {method:'POST'});
+  showToast('⏭ Skipped');
+  loadQueue();
+}
+
+async function bulkApprove() {
+  if (!confirm('Approve all archive/trash/label actions (not send/unsubscribe)?')) return;
+  const r = await fetch('/api/actions');
+  const d = await r.json();
+  const safeTypes = ['archive','label','flag'];
+  const ids = (d.actions||[]).filter(a => safeTypes.includes(a.action_type)).map(a => a.id);
+  if (ids.length === 0) { showToast('No safe actions to approve'); return; }
+  for (const id of ids) {
+    await fetch(`/api/actions/${id}/approve`, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+  }
+  showToast(`✅ Approved ${ids.length} actions`);
+  loadQueue(); loadInboxStats();
+}
+
+async function bulkReject() {
+  if (!confirm('Reject (skip) all pending actions?')) return;
+  const r = await fetch('/api/actions');
+  const d = await r.json();
+  for (const a of d.actions||[]) {
+    await fetch(`/api/actions/${a.id}/reject`, {method:'POST'});
+  }
+  showToast('Rejected all pending actions');
+  loadQueue();
+}
+
+// ─── Summaries ─────────────────────────────────────────────────────
+
+async function generateSummary(type) {
+  showToast('⏳ Generating ' + type + ' summary...');
+  const r = await fetch(`/api/summary/${type}`, {method:'POST'});
+  const d = await r.json();
+  if (d.success) { showToast(`✅ Summary generated (${d.count} emails)`); loadSummaries(); }
+  else showToast('❌ ' + d.error, true);
+}
+
+async function loadSummaries() {
+  const r = await fetch('/api/summaries');
+  const d = await r.json();
+  const list = document.getElementById('summaries-list');
+  document.getElementById('summary-viewer').style.display = 'none';
+  if (!d.summaries || d.summaries.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">📊</div><div>No summaries yet — click "Generate Daily" to create one</div></div>';
+    return;
+  }
+  list.innerHTML = d.summaries.map(s => `
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div>
+        <span style="font-weight:600">${s.type === 'daily' ? '📬 Daily' : '📊 Weekly'} Summary</span>
+        <span style="color:var(--dim);font-size:13px;margin-left:10px">${s.date}</span>
+        <span style="color:var(--dim);font-size:11px;margin-left:8px">${(s.created_at||'').substring(0,16)}</span>
+      </div>
+      <button class="btn btn-blue btn-sm" onclick="viewSummary(${s.id})">👁 View</button>
+    </div>`).join('');
+  list.style.display = 'block';
+}
+
+async function viewSummary(id) {
+  const r = await fetch(`/api/summaries/${id}`);
+  const d = await r.json();
+  document.getElementById('summaries-list').style.display = 'none';
+  const viewer = document.getElementById('summary-viewer');
+  viewer.style.display = 'block';
+  const iframe = document.getElementById('summary-iframe');
+  const blob = new Blob([d.html || ''], {type:'text/html'});
+  iframe.src = URL.createObjectURL(blob);
+}
+
+function closeSummaryViewer() {
+  document.getElementById('summary-viewer').style.display = 'none';
+  document.getElementById('summaries-list').style.display = 'block';
+}
+
+// ─── Logs ──────────────────────────────────────────────────────────
+
+async function loadLogs() {
+  const r = await fetch('/api/logs?limit=200');
+  const d = await r.json();
+  const tbody = document.getElementById('logs-table');
+  if (!d.logs || d.logs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No logs yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = d.logs.map(l => `<tr>
+    <td style="font-size:11px;white-space:nowrap">${(l.timestamp||'').substring(0,16)}</td>
+    <td><span class="mono">${(l.email_id||'').substring(0,12)}</span></td>
+    <td>${l.action||'—'}</td>
+    <td><span style="color:${l.result==='success'?'var(--green)':l.result==='error'?'var(--red)':'var(--muted)'}">${l.result||'—'}</span></td>
+    <td style="font-size:11px;color:var(--dim)">${esc(l.details||'')}</td>
+  </tr>`).join('');
+}
+
+// ─── Settings ──────────────────────────────────────────────────────
+
+async function loadSettings() {
+  const r = await fetch('/api/status');
+  const d = await r.json();
+  const cfg = d.config || {};
+  document.getElementById('s_ollama_url').value    = cfg.ollama_url || 'http://localhost:11434';
+  document.getElementById('s_ollama_model').value  = cfg.ollama_model || '';
+  document.getElementById('s_auto_archive_spam').checked  = cfg.auto_archive_spam !== 'false';
+  document.getElementById('s_auto_unsubscribe').checked   = cfg.auto_unsubscribe === 'true';
+  document.getElementById('s_require_approval').checked   = cfg.require_approval !== 'false';
+  document.getElementById('s_auto_threshold').value       = cfg.auto_threshold || '0.90';
+  document.getElementById('s_rate_limit_per_run').value   = cfg.rate_limit_per_run || '10';
+  document.getElementById('settings-auth-status').innerHTML = d.authenticated
+    ? '✅ Gmail is connected'
+    : '❌ Gmail is not connected — click Re-connect';
+}
+
+async function saveSettings() {
+  const data = {
+    ollama_url:         document.getElementById('s_ollama_url').value,
+    ollama_model:       document.getElementById('s_ollama_model').value,
+    auto_archive_spam:  document.getElementById('s_auto_archive_spam').checked ? 'true' : 'false',
+    auto_unsubscribe:   document.getElementById('s_auto_unsubscribe').checked ? 'true' : 'false',
+    require_approval:   document.getElementById('s_require_approval').checked ? 'true' : 'false',
+    auto_threshold:     document.getElementById('s_auto_threshold').value,
+    rate_limit_per_run: document.getElementById('s_rate_limit_per_run').value,
+    // Dummy required fields (won't overwrite existing)
+    gmail_client_id:    '_keep_', gmail_client_secret: '_keep_', gmail_address: '_keep_',
+  };
+  // Remove dummy fields if not set
+  const r1 = await fetch('/api/status'); const cfg = (await r1.json()).config||{};
+  if (cfg.gmail_client_id) { data.gmail_client_id = cfg.gmail_client_id; data.gmail_address = cfg.gmail_address || ''; }
+  // Fetch current secret from DB isn't exposed — just save what we have
+  delete data.gmail_client_secret;
+  // Patch: send partial update
+  await fetch('/api/setup', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({...data, gmail_client_secret: cfg.gmail_client_secret||''})});
+  const sv = document.getElementById('settings-saved');
+  sv.style.display = 'inline'; setTimeout(() => sv.style.display='none', 2500);
+  checkStatus();
+}
+
+async function revokeAuth() {
+  if (!confirm('Disconnect Gmail? You will need to re-connect.')) return;
+  await fetch('/api/auth/revoke', {method:'POST'});
+  showToast('Gmail disconnected');
+  loadSettings();
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function catIcon(cat) {
+  return {urgent:'🚨',work:'💼',personal:'👤',marketing:'📣',spam:'🗑️',notification:'🔔'}[cat]||'📧';
+}
+
+function actionIcon(a) {
+  return {archive:'📦',trash:'🗑️',label:'🏷️',flag:'🚩',draft_reply:'✍️',send_reply:'📤',unsubscribe:'🚫',skip:'⏭',flag:'🚩'}[a]||'▶';
+}
+
+function confColor(c) {
+  if (!c) return 'var(--dim)';
+  if (c >= 0.9) return 'var(--green)';
+  if (c >= 0.7) return 'var(--yellow)';
+  return 'var(--red)';
+}
+
+function showToast(msg, err=false) {
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:12px 20px;border-radius:10px;font-size:13px;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.4);transition:opacity .3s';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.borderColor = err ? 'var(--red)' : 'var(--green)';
+  t.style.opacity = '1';
+  setTimeout(() => t.style.opacity='0', 3000);
+}
+
+// Check for OAuth callback params
+const params = new URLSearchParams(window.location.search);
+if (params.get('auth_success')) {
+  showToast('✅ Gmail connected successfully!');
+  history.replaceState({}, '', '/');
+  checkStatus();
+}
+if (params.get('auth_error')) {
+  showToast('❌ Auth error: ' + params.get('auth_error'), true);
+  history.replaceState({}, '', '/');
+}
+</script>
+</body>
+</html>
