@@ -27,6 +27,7 @@
 | 🧊 **TripoSR 3D Pipeline** | Image → 3D mesh (Apple Silicon) | :5050 |
 | 🤖 **Tax AI Social** | AI social media content engine for tax/accounting firms | :5055 |
 | 🎙️ **Whisper STT** | 100% local speech-to-text for Open WebUI | :9000 |
+| 🧠 **AI Model Training Studio** | Fine-tune and train AI models on custom data. LoRA training, data processing, export to Ollama. | :8501 |
 
 ---
 
@@ -40,17 +41,18 @@
         ┌──────────────────┼──────────────────────┐
         │                  │                      │
         ▼                  ▼                      ▼
-  💬 Open WebUI      📈 Quant AI           📬 Gmail AI
+  💬 Open WebUI      📈 Quant AI           📧 Mail AI
   :3000              :8000                 :5051
-  + SearXNG          FastAPI+ChromaDB      Gmail API
+  + SearXNG          FastAPI+ChromaDB      IMAP + LLM
   :8080              vectorbt              Auto-triage
 
-        │                  │
-        ▼                  ▼
-  🧊 TripoSR         🤖 Tax AI Social
-  :5050              :5055
-  Image→3D           Instagram/Facebook/TikTok
-  OBJ/GLB export     Compliance + Auto-Post
+        │                  │                      │
+        ▼                  ▼                      ▼
+  🧊 TripoSR         🤖 Tax AI Social   🧠 AI Training
+  :5053              :5055              :8501
+  Image→3D           Instagram/         LoRA/Fine-tune
+  OBJ/GLB            Facebook/TikTok    Ollama Export
+  Apple Silicon      Compliance         Data Processing
 ```
 
 ---
@@ -610,4 +612,56 @@ img_url = generate_for_post("Tax deadline April 15th", specialty="tax_preparatio
 
 ---
 
-Built with ❤️ using [Ollama](https://ollama.com) · [Open WebUI](https://github.com/open-webui/open-webui) · [SearXNG](https://github.com/searxng/searxng) · [TripoSR](https://github.com/VAST-AI-Research/TripoSR) · [Flask](https://flask.palletsprojects.com) · Apple Silicon 🍎
+## 🧠 Tool 8 — AI Model Training Studio ⭐ NEW
+
+**Fine-tune and train AI models on your custom data. LoRA training, data processing, export to Ollama. Built with Streamlit.**
+
+```bash
+cd ai-model-training
+streamlit run app.py
+# Open: http://localhost:8501
+```
+
+### What it does
+- **📄 Data import** — Load training data from PDF, TXT, or CSV files
+- **🎓 LoRA training** — Fine-tune models without retraining from scratch
+- **🧠 Model selection** — Train on any Ollama model (mistral:7b, llama2, etc.)
+- **📊 Training dashboard** — Monitor loss, accuracy, training progress in real-time
+- **💾 Export to Ollama** — Save trained models as Ollama-compatible formats
+- **⚙️ Hyperparameter tuning** — Control learning rate, batch size, epochs, etc.
+- **✅ Data validation** — Automatic data cleaning and quality checks
+
+### Quick Start
+
+```bash
+cd ai-model-training
+pip install -r requirements.txt
+streamlit run app.py
+# Open: http://localhost:8501
+```
+
+### Features
+| Feature | Details |
+|---------|---------|
+| 📚 Multi-format input | PDF, TXT, JSON, CSV training data |
+| 🎯 LoRA training | Low-rank adaptation — fast fine-tuning |
+| 🧠 Model selection | Any Ollama model supported |
+| 📈 Real-time monitoring | Loss curves, accuracy tracking |
+| 💾 Export formats | GGUF, SafeTensors, PyTorch |
+| 🚀 One-click deploy | Export directly to Ollama |
+| 📊 Data processing | Auto-tokenization, chunking, filtering |
+
+### Training workflow
+```
+Your Data (PDF/TXT) → Data Processing → LoRA Training → Model Export → Ollama
+```
+
+### Use cases
+- **Specialized domain knowledge** — Train on your company docs, legal contracts, industry papers
+- **Custom business logic** — Fine-tune to your specific use cases (tax terms, medical jargon, code style)
+- **Faster inference** — Create smaller, specialized models for specific tasks
+- **Privacy-first** — All training happens locally on your Mac
+
+---
+
+Built with ❤️ using [Ollama](https://ollama.com) · [Open WebUI](https://github.com/open-webui/open-webui) · [SearXNG](https://github.com/searxng/searxng) · [TripoSR](https://github.com/VAST-AI-Research/TripoSR) · [Streamlit](https://streamlit.io) · [Flask](https://flask.palletsprojects.com) · Apple Silicon 🍎
