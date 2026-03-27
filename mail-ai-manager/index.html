@@ -359,7 +359,7 @@
   <div id="page-inbox" class="page" style="display:none">
     <div class="page-header">
       <div><div class="page-title">📥 Inbox</div><div class="page-subtitle">Classified emails from Gmail</div></div>
-      <div style="display:flex;gap:10px;align-items:center">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <select id="inbox-filter" class="form-group" style="margin:0;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:8px;font-size:13px">
           <option value="">All categories</option>
           <option value="urgent">🚨 Urgent</option>
@@ -370,6 +370,8 @@
           <option value="notification">🔔 Notification</option>
         </select>
         <button class="btn btn-green" onclick="runPipeline()" id="pipeline-btn">▶ Run Pipeline</button>
+        <button class="btn btn-blue" onclick="aiSortInbox()" id="ai-sort-btn">🧠 AI Sort</button>
+        <button class="btn btn-red" onclick="showBulkDeleteConfirm()" id="bulk-delete-btn">🗑️ Delete All Flagged</button>
       </div>
     </div>
 
@@ -1973,6 +1975,190 @@ function toggleWelcomePage(enabled) {
   localStorage.setItem('mailai_welcome_enabled', enabled ? 'true' : 'false');
   if (!enabled) showToast('Welcome page disabled — will open to Inbox on next load');
   else showToast('Welcome page enabled');
+}
+
+// ─── AI Sort Inbox (Classify All) ──────────────────────────────────
+
+let _aiSortPollInterval = null;
+
+async function aiSortInbox() {
+  const btn = document.getElementById('ai-sort-btn');
+  const bar = document.getElementById('pipeline-status-bar');
+  const res = document.getElementById('pipeline-result');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">🧠</span> Sorting...';
+  bar.innerHTML = '<span class="spin">🧠</span> AI is classifying all emails — this may take a few minutes...';
+  bar.style.display = 'block';
+  res.style.display = 'none';
+
+  try {
+    const r = await fetch('/api/emails/classify-all', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({force_all: true})
+    });
+    const d = await r.json();
+    if (!d.success) {
+      bar.style.display = 'none';
+      btn.disabled = false;
+      btn.textContent = '🧠 AI Sort';
+      showToast('❌ ' + d.error, true);
+      return;
+    }
+
+    // Poll for progress
+    if (_aiSortPollInterval) clearInterval(_aiSortPollInterval);
+    _aiSortPollInterval = setInterval(async () => {
+      try {
+        const pr = await fetch('/api/emails/classify-status');
+        const pd = await pr.json();
+
+        if (pd.total > 0) {
+          const pct = Math.round((pd.done / pd.total) * 100);
+          bar.innerHTML = `<span class="spin">🧠</span> AI classifying: <b>${pd.done}</b> / <b>${pd.total}</b> emails (${pct}%)`;
+        }
+
+        if (!pd.running) {
+          clearInterval(_aiSortPollInterval);
+          _aiSortPollInterval = null;
+          bar.style.display = 'none';
+          btn.disabled = false;
+          btn.textContent = '🧠 AI Sort';
+
+          if (pd.error) {
+            res.className = 'alert alert-error';
+            res.style.display = 'block';
+            res.textContent = '❌ AI Sort error: ' + pd.error;
+          } else {
+            res.className = 'alert alert-success';
+            res.style.display = 'block';
+            res.innerHTML = `✅ AI Sort complete! Classified <b>${pd.done}</b> emails. Categories and importance updated.`;
+          }
+          loadInbox();
+          loadInboxStats();
+        }
+      } catch (e) {
+        // Ignore poll errors
+      }
+    }, 2000);
+
+  } catch (e) {
+    bar.style.display = 'none';
+    btn.disabled = false;
+    btn.textContent = '🧠 AI Sort';
+    showToast('❌ ' + e.message, true);
+  }
+}
+
+// ─── Bulk Delete Flagged ───────────────────────────────────────────
+
+async function showBulkDeleteConfirm() {
+  // Fetch counts first
+  try {
+    const r = await fetch('/api/emails/flagged-counts');
+    const d = await r.json();
+    const counts = d.counts || {};
+    const total = d.total || 0;
+
+    if (total === 0) {
+      showToast('No spam or marketing emails to delete');
+      return;
+    }
+
+    // Build confirmation message
+    let details = [];
+    if (counts.spam) details.push(`🗑️ ${counts.spam} spam`);
+    if (counts.marketing) details.push(`📣 ${counts.marketing} marketing`);
+
+    // Show a selection dialog
+    const modal = document.getElementById('email-modal');
+    const modalEl = modal.querySelector('.modal');
+    document.getElementById('modal-subject').textContent = '🗑️ Bulk Delete Flagged Emails';
+    document.getElementById('modal-from').textContent = 'Select which categories to delete';
+    document.getElementById('modal-classification').innerHTML = `
+      <div class="alert alert-warn" style="margin-bottom:16px">
+        ⚠️ <strong>This will permanently trash emails in the selected categories.</strong><br>
+        Found: ${details.join(' · ')} — <b>${total} total</b>
+      </div>
+      <div style="margin-bottom:16px">
+        <div class="toggle-row" style="border-bottom:1px solid var(--border)">
+          <div>
+            <div class="toggle-label">🗑️ Spam (${counts.spam || 0})</div>
+            <div class="toggle-hint">Emails classified as spam by AI</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="bd-spam" checked><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">📣 Marketing (${counts.marketing || 0})</div>
+            <div class="toggle-hint">Promotional emails, newsletters, etc.</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="bd-marketing"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div id="bd-result" style="margin-top:10px"></div>
+    `;
+    document.getElementById('modal-body-text').style.display = 'none';
+    document.getElementById('modal-body-iframe').style.display = 'none';
+    document.getElementById('modal-draft-section').style.display = 'none';
+    document.getElementById('modal-actions').innerHTML = `
+      <button class="btn btn-gray btn-sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-red" onclick="executeBulkDelete()" id="bd-exec-btn">🗑️ Delete Selected (${total})</button>
+    `;
+    modal.style.display = 'flex';
+
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, true);
+  }
+}
+
+async function executeBulkDelete() {
+  const btn = document.getElementById('bd-exec-btn');
+  const resEl = document.getElementById('bd-result');
+  const categories = [];
+  if (document.getElementById('bd-spam').checked) categories.push('spam');
+  if (document.getElementById('bd-marketing').checked) categories.push('marketing');
+
+  if (categories.length === 0) {
+    resEl.innerHTML = '<div class="alert alert-warn">Select at least one category</div>';
+    return;
+  }
+
+  if (!confirm(`Are you sure you want to delete ALL ${categories.join(' + ')} emails? This cannot be undone.`)) {
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">🗑️</span> Deleting...';
+  resEl.innerHTML = '<span class="text-muted">⏳ Deleting emails...</span>';
+
+  try {
+    const r = await fetch('/api/emails/bulk-delete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({categories})
+    });
+    const d = await r.json();
+
+    if (d.success) {
+      resEl.innerHTML = `<div class="alert alert-success">✅ ${d.message}</div>`;
+      showToast(`✅ Deleted ${d.deleted} emails`);
+      setTimeout(() => {
+        closeModal();
+        loadInbox();
+        loadInboxStats();
+      }, 1500);
+    } else {
+      resEl.innerHTML = `<div class="alert alert-error">❌ ${d.error || 'Delete failed'}</div>`;
+      btn.disabled = false;
+      btn.textContent = '🗑️ Delete Selected';
+    }
+  } catch (e) {
+    resEl.innerHTML = `<div class="alert alert-error">❌ ${e.message}</div>`;
+    btn.disabled = false;
+    btn.textContent = '🗑️ Delete Selected';
+  }
 }
 
 // ─── Startup: check welcome preference ─────────────────────────────

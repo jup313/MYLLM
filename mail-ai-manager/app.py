@@ -21,6 +21,7 @@ from database import (
     reclassify_email, get_feedback_stats, get_sender_rules,
     add_email_account, get_email_accounts, get_email_account,
     update_email_account, delete_email_account,
+    mark_processed, log_action,
     PROVIDER_TEMPLATES,
 )
 
@@ -206,6 +207,141 @@ def api_auth_revoke():
 
 
 # (Calendar now uses CalDAV with IMAP credentials — no OAuth needed)
+
+
+# ── Bulk Classify (AI Sort) ──────────────────────────────────────────
+
+_classify_status = {"running": False, "total": 0, "done": 0, "error": None}
+
+
+def _run_classify_thread(force_all=False):
+    """Background thread: classify emails via LLM."""
+    global _classify_status
+    try:
+        from llm_engine import classify_email
+
+        # Get emails to classify
+        conn = db.get_conn()
+        if force_all:
+            rows = conn.execute(
+                "SELECT * FROM emails ORDER BY date DESC LIMIT 500"
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM emails WHERE (category IS NULL OR category = '') ORDER BY date DESC LIMIT 500"
+            ).fetchall()
+        conn.close()
+        emails = [dict(r) for r in rows]
+
+        _classify_status["total"] = len(emails)
+        _classify_status["done"] = 0
+
+        for email in emails:
+            if not _classify_status["running"]:
+                break
+            try:
+                c = classify_email(email)
+                conn = db.get_conn()
+                conn.execute("""
+                    UPDATE emails SET category=?, confidence=?, llm_action=?,
+                    importance=?, importance_reason=? WHERE id=?
+                """, (
+                    c["category"], c["confidence"], c["action"],
+                    c.get("importance", "not_important"),
+                    c.get("importance_reason", ""),
+                    email["id"],
+                ))
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                print(f"  ⚠️  Classify error for {email.get('id')}: {e}")
+            _classify_status["done"] += 1
+
+        _classify_status["running"] = False
+    except Exception as e:
+        _classify_status = {"running": False, "total": 0, "done": 0, "error": str(e)}
+
+
+@app.route("/api/emails/classify-all", methods=["POST"])
+def api_classify_all():
+    """Classify/reclassify all emails via LLM (background thread)."""
+    global _classify_status
+    if _classify_status["running"]:
+        return jsonify({"success": False, "error": "Classification already running"}), 409
+    data = request.get_json() or {}
+    force_all = data.get("force_all", True)
+    _classify_status = {"running": True, "total": 0, "done": 0, "error": None}
+    thread = threading.Thread(target=_run_classify_thread, args=(force_all,), daemon=True)
+    thread.start()
+    return jsonify({"success": True, "message": "AI classification started"})
+
+
+@app.route("/api/emails/classify-status")
+def api_classify_status():
+    """Check progress of background classification."""
+    return jsonify(_classify_status)
+
+
+# ── Bulk Delete Flagged ──────────────────────────────────────────────
+
+@app.route("/api/emails/bulk-delete", methods=["POST"])
+def api_bulk_delete():
+    """Bulk trash all emails in specified categories."""
+    data = request.get_json() or {}
+    categories = data.get("categories", ["spam"])
+
+    if not categories:
+        return jsonify({"success": False, "error": "No categories specified"}), 400
+
+    conn = db.get_conn()
+    placeholders = ",".join("?" * len(categories))
+    rows = conn.execute(
+        f"SELECT id FROM emails WHERE category IN ({placeholders})",
+        categories,
+    ).fetchall()
+    conn.close()
+
+    email_ids = [r["id"] for r in rows]
+
+    if not email_ids:
+        return jsonify({"success": True, "deleted": 0, "message": "No matching emails"})
+
+    deleted = 0
+    errors  = 0
+    from action_engine import trash_email as _trash, mark_read as _mark_read
+
+    for eid in email_ids:
+        try:
+            _trash(eid)
+            mark_processed(eid)
+            log_action(eid, "bulk_trash", "success",
+                       f"Bulk delete ({', '.join(categories)})")
+            deleted += 1
+        except Exception as e:
+            errors += 1
+            print(f"  ⚠️  Bulk delete error {eid}: {e}")
+
+    return jsonify({
+        "success": True,
+        "deleted": deleted,
+        "errors":  errors,
+        "total":   len(email_ids),
+        "message": f"Deleted {deleted} emails from: {', '.join(categories)}",
+    })
+
+
+@app.route("/api/emails/flagged-counts")
+def api_flagged_counts():
+    """Get counts of emails per category for bulk-delete confirmation."""
+    conn = db.get_conn()
+    rows = conn.execute("""
+        SELECT category, COUNT(*) as cnt FROM emails
+        WHERE category IN ('spam','marketing')
+        GROUP BY category
+    """).fetchall()
+    conn.close()
+    counts = {r["category"]: r["cnt"] for r in rows}
+    return jsonify({"counts": counts, "total": sum(counts.values())})
 
 
 # ── Pipeline ─────────────────────────────────────────────────────────
