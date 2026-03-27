@@ -224,11 +224,11 @@ def _run_classify_thread(force_all=False):
         conn = db.get_conn()
         if force_all:
             rows = conn.execute(
-                "SELECT * FROM emails ORDER BY date DESC LIMIT 500"
+                "SELECT * FROM emails ORDER BY date DESC"
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT * FROM emails WHERE (category IS NULL OR category = '') ORDER BY date DESC LIMIT 500"
+                "SELECT * FROM emails WHERE (category IS NULL OR category = '') ORDER BY date DESC"
             ).fetchall()
         conn.close()
         emails = [dict(r) for r in rows]
@@ -365,11 +365,12 @@ def api_pipeline_run():
     if _pipeline_status["running"]:
         return jsonify({"success": False, "error": "Pipeline already running"}), 409
     data = request.get_json() or {}
-    max_emails = int(data.get("max_emails", 30))
+    max_emails = int(data.get("max_emails", 0))
     _pipeline_status = {"running": True, "stats": None, "error": None}
     thread = threading.Thread(target=_run_pipeline_thread, args=(max_emails,), daemon=True)
     thread.start()
-    return jsonify({"success": True, "message": f"Pipeline started (max {max_emails} emails)"})
+    label = "all emails" if max_emails == 0 else f"max {max_emails} emails"
+    return jsonify({"success": True, "message": f"Pipeline started ({label})"})
 
 
 @app.route("/api/pipeline/status")

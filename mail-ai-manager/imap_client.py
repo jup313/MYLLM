@@ -190,13 +190,13 @@ def _parse_email_message(msg_data, msg_id_str):
     }
 
 
-def fetch_unread(max_results: int = 50) -> list:
-    """Fetch ALL recent emails from IMAP inbox (read + unread)."""
+def fetch_unread(max_results: int = 0) -> list:
+    """Fetch ALL emails from IMAP inbox (read + unread). 0 = no limit."""
     return fetch_all(max_results=max_results)
 
 
-def fetch_all(max_results: int = 50) -> list:
-    """Fetch the most recent emails from IMAP inbox (both read and unread)."""
+def fetch_all(max_results: int = 0) -> list:
+    """Fetch emails from IMAP inbox. max_results=0 means ALL emails (no limit)."""
     try:
         imap = _get_connection()
         imap.select("INBOX", readonly=True)
@@ -207,10 +207,12 @@ def fetch_all(max_results: int = 50) -> list:
             imap.logout()
             return []
 
-        # Get the most recent N message IDs
+        # Get message IDs — 0 means all, otherwise take last N
         msg_ids = messages[0].split()
-        # Take the last N (most recent)
-        recent_ids = msg_ids[-max_results:] if len(msg_ids) > max_results else msg_ids
+        if max_results > 0 and len(msg_ids) > max_results:
+            recent_ids = msg_ids[-max_results:]
+        else:
+            recent_ids = msg_ids
         # Reverse so newest first
         recent_ids = list(reversed(recent_ids))
 
@@ -337,8 +339,8 @@ def _get_account_connection(account: dict):
     return imap
 
 
-def fetch_from_account(account: dict, max_results: int = 30) -> list:
-    """Fetch emails from a specific email account."""
+def fetch_from_account(account: dict, max_results: int = 0) -> list:
+    """Fetch emails from a specific email account. 0 = no limit (all emails)."""
     account_id = account.get("id")
     account_email = account.get("email", "unknown")
     try:
@@ -351,7 +353,10 @@ def fetch_from_account(account: dict, max_results: int = 30) -> list:
             return []
 
         msg_ids = messages[0].split()
-        recent_ids = msg_ids[-max_results:] if len(msg_ids) > max_results else msg_ids
+        if max_results > 0 and len(msg_ids) > max_results:
+            recent_ids = msg_ids[-max_results:]
+        else:
+            recent_ids = msg_ids
         recent_ids = list(reversed(recent_ids))
 
         emails = []
@@ -384,7 +389,7 @@ def fetch_from_account(account: dict, max_results: int = 30) -> list:
         return []
 
 
-def fetch_all_accounts(max_per_account: int = 30) -> list:
+def fetch_all_accounts(max_per_account: int = 0) -> list:
     """Fetch emails from all enabled email accounts + the primary IMAP config."""
     all_emails = []
 

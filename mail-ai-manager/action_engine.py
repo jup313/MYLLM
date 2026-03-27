@@ -84,7 +84,7 @@ def _rate_limit() -> int:
 
 # ── Main pipeline ─────────────────────────────────────────────────────
 
-def run_pipeline(max_emails: int = 30) -> dict:
+def run_pipeline(max_emails: int = 0) -> dict:
     """
     Full pipeline:
     1. Fetch unread emails from Gmail

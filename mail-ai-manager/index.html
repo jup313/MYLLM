@@ -983,7 +983,7 @@ async function runPipeline() {
   bar.style.display = 'block';
   res.style.display = 'none';
   try {
-    const r = await fetch('/api/pipeline/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({max_emails:30})});
+    const r = await fetch('/api/pipeline/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({max_emails:0})});
     const d = await r.json();
     if (!d.success) { bar.style.display='none'; btn.disabled=false; alert(d.error); return; }
     // Poll
