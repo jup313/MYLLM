@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 llm_engine.py — Ollama LLM classifier + reply drafter
-Classifies emails and generates draft replies.
+Classifies emails with importance detection and learns from user feedback.
 """
 
 import json
 import re
 import requests
-from database import get_config
+from database import get_config, get_sender_rule, get_recent_feedback_for_prompt
 
 CATEGORIES = ["spam", "marketing", "personal", "work", "urgent", "notification"]
 
@@ -18,12 +18,16 @@ Subject: {subject}
 From: {sender} <{sender_email}>
 Body: {body}
 
+{feedback_context}
+
 Return ONLY this JSON (no markdown, no explanation):
 {{
   "category": "spam|marketing|personal|work|urgent|notification",
   "confidence": 0.0-1.0,
   "action": "archive|label|trash|draft_reply|unsubscribe|flag",
   "priority": "low|medium|high",
+  "importance": "important|not_important",
+  "importance_reason": "one sentence why important or not",
   "reason": "one sentence explanation",
   "is_bulk_sender": true|false,
   "needs_reply": true|false
@@ -64,7 +68,7 @@ def _call_ollama(prompt: str, system: str = None, timeout: int = 60) -> str:
         "stream": False,
         "options": {
             "temperature": 0.3,
-            "num_predict": 300,
+            "num_predict": 400,
         }
     }
 
@@ -91,31 +95,80 @@ def check_ollama() -> dict:
         return {"running": False, "models": [], "error": str(e)}
 
 
+def _build_feedback_context(sender_email: str) -> str:
+    """Build few-shot learning context from user feedback and sender rules."""
+    parts = []
+
+    # Check if we have a learned rule for this sender
+    rule = get_sender_rule(sender_email)
+    if rule and rule.get("hit_count", 0) >= 1:
+        parts.append(
+            f"IMPORTANT: The user has previously classified emails from '{sender_email}' as "
+            f"category='{rule['default_category']}', importance='{rule['default_importance']}'. "
+            f"Follow this preference unless the email content strongly suggests otherwise."
+        )
+
+    # Get recent feedback examples for few-shot learning
+    feedback = get_recent_feedback_for_prompt(limit=8)
+    if feedback:
+        examples = []
+        for fb in feedback:
+            if fb.get("subject"):
+                examples.append(
+                    f"  - From: {fb.get('sender', '?')} | Subject: '{fb.get('subject', '?')[:60]}' "
+                    f"→ category={fb['corrected_category']}, importance={fb['corrected_importance']}"
+                )
+        if examples:
+            parts.append("Recent user corrections (learn from these):\n" + "\n".join(examples))
+
+    return "\n\n".join(parts) if parts else ""
+
+
 def classify_email(email: dict) -> dict:
     """
-    Classify an email using the LLM.
-    Returns: {category, confidence, action, priority, reason, is_bulk_sender, needs_reply}
+    Classify an email using the LLM with importance detection.
+    Checks sender rules first, then uses LLM with few-shot context.
+    Returns: {category, confidence, action, priority, importance, importance_reason, reason, ...}
     """
     subject      = email.get("subject", "")
     sender       = email.get("sender", "")
     sender_email = email.get("sender_email", "")
     body         = email.get("body", email.get("snippet", ""))[:1500]
 
-    # Quick heuristics first (fast path, no LLM needed)
+    # Check sender rules first (instant classification from learned preferences)
+    rule = get_sender_rule(sender_email)
+    if rule and rule.get("hit_count", 0) >= 2:
+        # High confidence rule — apply directly
+        return {
+            "category": rule["default_category"],
+            "confidence": min(0.85 + rule["hit_count"] * 0.02, 0.98),
+            "action": rule.get("default_action", "label"),
+            "priority": "high" if rule["default_importance"] == "important" else "low",
+            "importance": rule["default_importance"] or "not_important",
+            "importance_reason": f"Learned from {rule['hit_count']} user corrections",
+            "reason": f"Auto-classified by learned sender rule ({rule['hit_count']}x corrected)",
+            "is_bulk_sender": rule["default_category"] in ("spam", "marketing"),
+            "needs_reply": rule["default_category"] in ("work", "personal", "urgent"),
+        }
+
+    # Quick heuristics (fast path, no LLM needed)
     heuristic = _heuristic_classify(email)
     if heuristic and heuristic.get("confidence", 0) >= 0.95:
         return heuristic
+
+    # Build few-shot learning context
+    feedback_context = _build_feedback_context(sender_email)
 
     prompt = CLASSIFY_PROMPT.format(
         subject=subject,
         sender=sender,
         sender_email=sender_email,
-        body=body
+        body=body,
+        feedback_context=feedback_context
     )
 
     try:
         response = _call_ollama(prompt, timeout=45)
-        # Extract JSON from response
         result = _parse_json_response(response)
         if result:
             # Sanitize
@@ -123,9 +176,14 @@ def classify_email(email: dict) -> dict:
             result["confidence"] = float(result.get("confidence", 0.7))
             result["action"]     = result.get("action", "label").lower()
             result["priority"]   = result.get("priority", "low").lower()
+            result["importance"] = result.get("importance", "not_important").lower()
+            result["importance_reason"] = result.get("importance_reason", "")
             result["reason"]     = result.get("reason", "")
             result["is_bulk_sender"] = bool(result.get("is_bulk_sender", False))
             result["needs_reply"]    = bool(result.get("needs_reply", False))
+            # Normalize importance
+            if result["importance"] not in ("important", "not_important"):
+                result["importance"] = "important" if result["priority"] == "high" else "not_important"
             # Override: if unsubscribe URL exists, flag for unsubscribe
             if email.get("unsubscribe_url") and result["category"] == "marketing":
                 result["action"] = "unsubscribe"
@@ -139,6 +197,8 @@ def classify_email(email: dict) -> dict:
         "confidence": 0.5,
         "action": "label",
         "priority": "low",
+        "importance": "not_important",
+        "importance_reason": "LLM unavailable — manual review needed",
         "reason": "LLM unavailable — manual review",
         "is_bulk_sender": False,
         "needs_reply": False,
@@ -169,10 +229,10 @@ def generate_summary_text(emails: list, period: str = "daily") -> str:
     if not emails:
         return "No emails to summarize."
 
-    # Build a compact list for the LLM
     email_list = ""
-    for e in emails[:30]:  # Limit to 30 for context
-        email_list += f"- [{e.get('category','?')}] From: {e.get('sender','?')} | Subject: {e.get('subject','?')}\n"
+    for e in emails[:30]:
+        imp = e.get("importance", "?")
+        email_list += f"- [{e.get('category','?')}] [{imp}] From: {e.get('sender','?')} | Subject: {e.get('subject','?')}\n"
 
     prompt = f"""Summarize these emails in a {period} report. Be concise and highlight priorities.
 
@@ -181,8 +241,8 @@ Emails ({len(emails)} total):
 
 Write a brief executive summary (3-5 sentences) noting:
 1. Total count and categories
-2. Any urgent/important items
-3. What can be ignored
+2. Any urgent/important items that need attention
+3. What can be safely ignored
 Keep it under 150 words."""
 
     try:
@@ -224,6 +284,8 @@ def _heuristic_classify(email: dict) -> dict | None:
             "confidence": 0.96,
             "action": "trash",
             "priority": "low",
+            "importance": "not_important",
+            "importance_reason": "Spam email — not important",
             "reason": f"Matches {spam_hits} spam keywords",
             "is_bulk_sender": True,
             "needs_reply": False,
@@ -238,6 +300,8 @@ def _heuristic_classify(email: dict) -> dict | None:
             "confidence": 0.92,
             "action": action,
             "priority": "low",
+            "importance": "not_important",
+            "importance_reason": "Marketing/promotional email — not important",
             "reason": f"Marketing email ({marketing_hits} signals, unsub={'yes' if has_unsub else 'no'})",
             "is_bulk_sender": True,
             "needs_reply": False,
@@ -248,12 +312,10 @@ def _heuristic_classify(email: dict) -> dict | None:
 
 def _parse_json_response(text: str) -> dict | None:
     """Extract JSON object from LLM response."""
-    # Try direct parse
     try:
         return json.loads(text)
     except Exception:
         pass
-    # Try extracting JSON block
     match = re.search(r"\{[^{}]+\}", text, re.DOTALL)
     if match:
         try:

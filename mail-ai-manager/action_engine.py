@@ -15,8 +15,11 @@ from database import (
 def _get_mail_client():
     """Return the appropriate mail client module based on config."""
     from database import get_config as _gc
-    mode = _gc("mail_mode") or "macos_mail"
-    if mode == "macos_mail":
+    mode = _gc("mail_mode") or "imap"
+    if mode == "imap":
+        import imap_client
+        return imap_client
+    elif mode == "macos_mail":
         import macos_mail
         return macos_mail
     else:
@@ -104,11 +107,15 @@ def run_pipeline(max_emails: int = 30) -> dict:
     print(f"  📬 Gmail AI Manager — Pipeline Run")
     print(f"{'='*60}\n")
 
-    # Step 1: Fetch
+    # Step 1: Fetch (multi-account if available)
     try:
-        emails = fetch_unread(max_results=max_emails)
+        client = _get_mail_client()
+        if hasattr(client, 'fetch_all_accounts'):
+            emails = client.fetch_all_accounts(max_per_account=max_emails)
+        else:
+            emails = fetch_unread(max_results=max_emails)
         stats["fetched"] = len(emails)
-        print(f"📥 Fetched {len(emails)} unread emails")
+        print(f"📥 Fetched {len(emails)} emails (multi-account)")
     except Exception as e:
         print(f"❌ Fetch error: {e}")
         stats["errors"] += 1
@@ -128,6 +135,8 @@ def run_pipeline(max_emails: int = 30) -> dict:
                 "category":   classification["category"],
                 "confidence": classification["confidence"],
                 "llm_action": classification["action"],
+                "importance": classification.get("importance", "not_important"),
+                "importance_reason": classification.get("importance_reason", ""),
             })
 
             # Generate draft reply if needed

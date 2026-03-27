@@ -1,6 +1,6 @@
-# 📬 Gmail AI Manager
+# 📬 Mail AI Manager
 
-**Local LLM-powered Gmail management — runs 100% on your Mac. No cloud AI. No data leaves your machine.**
+**Local LLM-powered email management — runs 100% on your Mac. No cloud AI. No data leaves your machine.**
 
 Built for **Mac 16GB** (M1/M2/M3/M4) using Ollama + Mistral/LLaMA3.
 
@@ -12,12 +12,14 @@ Built for **Mac 16GB** (M1/M2/M3/M4) using Ollama + Mistral/LLaMA3.
 |---------|-------------|
 | 🧠 **Local LLM Classification** | Classifies every email: urgent / work / personal / marketing / spam / notification |
 | ✅ **Approval Queue** | All AI actions require your approval before executing |
-| ✍️ **Draft Reply Generator** | AI drafts replies you can edit + send or save to Gmail |
+| ✍️ **Draft Reply Generator** | AI drafts replies you can edit + send or save |
 | 🗑️ **Smart Spam Trash** | Auto-trash high-confidence spam (configurable threshold) |
 | 🚫 **Safe Unsubscribe** | RFC 2369 List-Unsubscribe only — never clicks body links |
 | 📊 **Daily/Weekly Summaries** | Beautiful HTML digest reports of your inbox |
+| 📅 **Google Calendar Integration** | CalDAV-based calendar — view events and create new ones from AI suggestions |
 | 📋 **Audit Log** | Every action logged with timestamp + result |
-| 🔐 **OAuth2 Gmail** | Google OAuth2 — token stored locally only |
+| 🔐 **IMAP + App Password** | Secure Gmail access via IMAP — uses Google App Password (no OAuth needed) |
+| 👥 **Multi-Account Support** | Manage multiple Gmail accounts from one dashboard |
 
 ---
 
@@ -42,40 +44,108 @@ ollama pull mistral:7b
 ollama serve
 ```
 
-### 2. Setup
+### 2. Install Dependencies
 
 ```bash
-cd gmail-ai-manager
-bash setup.sh
+cd mail-ai-manager
+pip install flask caldav imapclient beautifulsoup4 requests
 ```
 
 ### 3. Start
 
 ```bash
-bash start.sh
-# Opens http://localhost:5051 automatically
+python app.py
+# Opens http://localhost:5051
 ```
 
 ### 4. Configure in the UI
 
-1. **Step 1 — Google API**: Enter your OAuth2 credentials ([how to get them](#google-api-setup))
-2. **Step 2 — LLM**: Point to Ollama, choose your model, test connection
-3. **Step 3 — Behavior**: Set automation preferences
-4. **Step 4 — Connect Gmail**: OAuth2 sign-in
+1. **Add Account** — Enter your Gmail address and App Password ([how to get one](#-how-to-get-a-google-app-password))
+2. **LLM Settings** — Point to Ollama, choose your model, test connection
+3. **Behavior** — Set automation preferences (auto-archive spam, approval queue, etc.)
 
 ---
 
-## 🔑 Google API Setup
+## 🔑 Accounts & Passwords Setup
 
-1. Go to [console.cloud.google.com](https://console.cloud.google.com)
-2. Create a new project
-3. **APIs & Services** → **Library** → enable **Gmail API**
-4. **APIs & Services** → **Credentials** → **Create Credentials** → **OAuth 2.0 Client ID**
-   - Application type: **Desktop app**
-5. Copy the **Client ID** and **Client Secret** into the Setup Wizard
-6. Add `http://localhost:5051` to **Authorized redirect URIs**
+Mail AI Manager uses **IMAP** to read your email and **CalDAV** to access your Google Calendar. Both use the same **Google App Password** — no OAuth2 or Google Cloud Console setup required.
 
-> ✅ All credentials are stored locally in SQLite — nothing is sent to any remote server.
+### What You Need
+
+| Item | Description |
+|------|-------------|
+| **Gmail Address** | Your full Gmail address (e.g., `yourname@gmail.com`) |
+| **Google App Password** | A 16-character password generated from your Google Account |
+
+> ⚠️ **Important:** App Passwords require **2-Step Verification** to be enabled on your Google Account.
+
+### The Same App Password Powers Everything
+
+Once you generate a Google App Password, it is used for:
+
+- 📧 **IMAP Email Access** — Fetching and managing your emails
+- 📅 **CalDAV Calendar** — Reading and creating Google Calendar events
+
+You only need **one App Password per Gmail account**.
+
+---
+
+## 🔐 How to Get a Google App Password
+
+Follow these steps to generate an App Password for your Gmail account:
+
+### Step 1: Enable 2-Step Verification
+
+1. Go to [myaccount.google.com/security](https://myaccount.google.com/security)
+2. Sign in with your Google account
+3. Scroll down to **"How you sign in to Google"**
+4. Click **2-Step Verification**
+5. Follow the prompts to enable it (you'll need your phone for verification)
+
+### Step 2: Generate an App Password
+
+1. Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+   - If this link doesn't work, go to **Google Account** → **Security** → **2-Step Verification** → scroll to bottom → **App passwords**
+2. You may need to sign in again
+3. In the **"App name"** field, type a name like `Mail AI Manager`
+4. Click **Create**
+5. Google will display a **16-character password** (formatted like `abcd efgh ijkl mnop`)
+6. **Copy this password** — you will need it in the next step
+
+> ⚠️ **Save this password somewhere safe!** Google will only show it once. If you lose it, you'll need to generate a new one.
+
+### Step 3: Add the Account in Mail AI Manager
+
+1. Open Mail AI Manager at `http://localhost:5051`
+2. Go to the **Settings** or **Accounts** section
+3. Click **Add Account**
+4. Enter:
+   - **Email**: `yourname@gmail.com`
+   - **Password**: The 16-character App Password from Step 2 (spaces are optional)
+5. Click **Save** — the app will test the IMAP connection automatically
+
+> ✅ All credentials are stored locally in SQLite (`gmail_ai.db`) — nothing is sent to any remote server.
+
+---
+
+## 📅 Google Calendar (CalDAV) Setup
+
+Calendar integration works automatically once your account is configured. **No additional setup is required** — it uses the same Gmail address and App Password.
+
+### How It Works
+
+- Mail AI Manager connects to Google Calendar using the **CalDAV protocol**
+- CalDAV URL: `https://www.google.com/calendar/dav/{your-email}/events/`
+- Authentication uses your Gmail address + the same App Password
+- You can view upcoming events and create new calendar entries from AI-suggested actions
+
+### Calendar Features
+
+| Feature | Description |
+|---------|-------------|
+| 📋 **View Events** | See your upcoming Google Calendar events in the dashboard |
+| ➕ **Create Events** | AI can suggest calendar events from email content |
+| 🔗 **Same Credentials** | Uses the same App Password as email — no extra setup |
 
 ---
 
@@ -97,24 +167,22 @@ ollama pull mistral:7b   # recommended
 ## 🏗️ Architecture
 
 ```
-gmail-ai-manager/
-├── app.py              # Flask web server + API routes
-├── database.py         # SQLite storage (emails, actions, logs, config)
-├── gmail_client.py     # Gmail API + OAuth2 client
+mail-ai-manager/
+├── app.py              # Flask web server + API routes (port 5051)
+├── database.py         # SQLite storage (emails, actions, logs, config, accounts)
+├── imap_client.py      # IMAP email client + HTML-to-text processing
+├── calendar_engine.py  # CalDAV Google Calendar integration
 ├── llm_engine.py       # Ollama LLM classify/draft/summarize
 ├── action_engine.py    # Pipeline orchestrator + action executor
-├── unsubscribe.py      # Safe RFC 2369 unsubscribe handler
-├── summarizer.py       # Daily/weekly HTML summary generator
-├── index.html          # Full web dashboard (no npm/node needed)
-├── setup.sh            # One-command dependency installer
-├── start.sh            # Start server + open browser
+├── macos_mail.py       # macOS Mail.app integration utilities
+├── index.html          # Full web dashboard (single-page, no npm/node needed)
 └── gmail_ai.db         # SQLite database (auto-created, gitignored)
 ```
 
 ### Pipeline Flow
 
 ```
-Gmail API → Fetch emails
+IMAP → Fetch emails (Gmail App Password)
     ↓
 LLM Engine → Classify (category + confidence + suggested action)
     ↓
@@ -123,6 +191,8 @@ Action Engine → Auto-act (spam trash) or Queue for approval
 Approval Queue (UI) → You approve/reject each action
     ↓
 Execute: archive / label / draft reply / send / unsubscribe
+    ↓
+Calendar Engine → Create events from email context (CalDAV)
 ```
 
 ---
@@ -143,11 +213,37 @@ All settings are in the web UI → **Settings** tab. Key options:
 
 ## 🔒 Privacy & Safety
 
-- **All data stays local** — SQLite + local Ollama
-- **OAuth2 token** stored only in `token.json` (gitignored)
+- **All data stays local** — SQLite database + local Ollama LLM
+- **App Password** stored only in local SQLite (gitignored database)
+- **No OAuth2 / No Google Cloud Console** needed — just a simple App Password
 - **No body link clicking** — unsubscribe uses RFC 2369 headers only
 - **Approval required** for send/unsubscribe by default
-- **SSL verification** enforced for all HTTP requests
+- **IMAP over SSL** (port 993) for secure email access
+- **CalDAV over HTTPS** for secure calendar access
+
+---
+
+## 🛠️ Troubleshooting
+
+### "IMAP connection failed"
+- Verify your App Password is correct (16 characters, no spaces needed)
+- Make sure **IMAP is enabled** in Gmail: Go to Gmail → Settings → See all settings → Forwarding and POP/IMAP → Enable IMAP
+- Check that **2-Step Verification** is enabled on your Google Account
+
+### "Calendar not connecting"
+- Calendar uses the same App Password as email — no separate setup needed
+- Verify the account is working for email first
+- Check that Google Calendar is accessible at [calendar.google.com](https://calendar.google.com)
+
+### "App Password option not showing"
+- You **must** enable 2-Step Verification first
+- Go to [myaccount.google.com/security](https://myaccount.google.com/security) → 2-Step Verification → turn it on
+- Then visit [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+
+### "Ollama not responding"
+- Make sure Ollama is running: `ollama serve`
+- Verify a model is installed: `ollama list`
+- Pull a model if needed: `ollama pull mistral:7b`
 
 ---
 

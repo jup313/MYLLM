@@ -17,7 +17,11 @@ from database import (
     init_db, get_config, set_config, get_all_config,
     is_configured, get_emails, get_email,
     get_pending_actions, complete_action, reject_action,
-    get_audit_log, get_stats, get_summaries, get_summary
+    get_audit_log, get_stats, get_summaries, get_summary,
+    reclassify_email, get_feedback_stats, get_sender_rules,
+    add_email_account, get_email_accounts, get_email_account,
+    update_email_account, delete_email_account,
+    PROVIDER_TEMPLATES,
 )
 
 app = Flask(__name__, static_folder=".", static_url_path="")
@@ -48,8 +52,13 @@ def api_status():
     from llm_engine import check_ollama
     
     # Check auth based on configured mail mode
-    mail_mode = get_config("mail_mode") or "macos_mail"
-    if mail_mode == "macos_mail":
+    mail_mode = get_config("mail_mode") or "imap"
+    if mail_mode == "imap":
+        try:
+            from imap_client import is_authenticated
+        except ImportError:
+            is_authenticated = lambda: False
+    elif mail_mode == "macos_mail":
         try:
             from macos_mail import is_authenticated
         except ImportError:
@@ -58,10 +67,7 @@ def api_status():
         try:
             from imap_client import is_authenticated
         except ImportError:
-            try:
-                from gmail_client import is_authenticated
-            except ImportError:
-                is_authenticated = lambda: False
+            is_authenticated = lambda: False
     
     ollama = check_ollama()
     return jsonify({
@@ -197,6 +203,9 @@ def api_auth_revoke():
     if TOKEN_PATH.exists():
         TOKEN_PATH.unlink()
     return jsonify({"success": True})
+
+
+# (Calendar now uses CalDAV with IMAP credentials — no OAuth needed)
 
 
 # ── Pipeline ─────────────────────────────────────────────────────────
@@ -366,13 +375,24 @@ def api_logs():
 
 @app.route("/api/calendar/status")
 def api_calendar_status():
-    """Check if Google Calendar is authorized."""
+    """Check if Google Calendar (CalDAV) is reachable using IMAP credentials."""
+    mail_mode = get_config("mail_mode") or "imap"
+    has_imap_creds = bool(get_config("mail_imap_username") and get_config("mail_imap_password"))
     try:
         from calendar_engine import is_calendar_authorized
         authorized = is_calendar_authorized()
-        return jsonify({"authorized": authorized})
+        return jsonify({
+            "authorized": authorized,
+            "mail_mode": mail_mode,
+            "has_imap_creds": has_imap_creds,
+        })
     except Exception as e:
-        return jsonify({"authorized": False, "error": str(e)})
+        return jsonify({
+            "authorized": False,
+            "mail_mode": mail_mode,
+            "has_imap_creds": has_imap_creds,
+            "error": str(e),
+        })
 
 
 @app.route("/api/calendar/events")
@@ -465,6 +485,160 @@ def api_llm_classify():
     from llm_engine import classify_email
     result = classify_email(email)
     return jsonify(result)
+
+
+# ── Reclassification & Feedback ──────────────────────────────────────
+
+@app.route("/api/emails/<email_id>/reclassify", methods=["POST"])
+def api_reclassify(email_id):
+    """Reclassify an email — saves feedback for LLM learning."""
+    data = request.get_json() or {}
+    category   = data.get("category")
+    importance = data.get("importance")
+    action     = data.get("action")
+    if not any([category, importance, action]):
+        return jsonify({"success": False, "error": "Provide at least one of: category, importance, action"}), 400
+    result = reclassify_email(email_id, category=category, importance=importance, action=action)
+    return jsonify(result)
+
+
+@app.route("/api/feedback/stats")
+def api_feedback_stats():
+    """Get feedback accuracy stats."""
+    return jsonify(get_feedback_stats())
+
+
+@app.route("/api/feedback/rules")
+def api_feedback_rules():
+    """Get learned sender rules."""
+    return jsonify({"rules": get_sender_rules(limit=200)})
+
+
+# ── Email Accounts (Multi-Provider) ─────────────────────────────────
+
+@app.route("/api/providers")
+def api_providers():
+    """List available email provider templates."""
+    return jsonify({"providers": PROVIDER_TEMPLATES})
+
+
+@app.route("/api/accounts", methods=["GET"])
+def api_list_accounts():
+    """List all email accounts."""
+    accounts = get_email_accounts()
+    # Don't expose passwords in list
+    for a in accounts:
+        if a.get("imap_pass"):
+            a["imap_pass"] = "••••••••"
+        if a.get("smtp_pass"):
+            a["smtp_pass"] = "••••••••"
+    return jsonify({"accounts": accounts, "count": len(accounts)})
+
+
+@app.route("/api/accounts", methods=["POST"])
+def api_add_account():
+    """Add a new email account."""
+    data = request.get_json() or {}
+    email_addr = data.get("email")
+    if not email_addr:
+        return jsonify({"success": False, "error": "email is required"}), 400
+
+    # Auto-fill from provider template
+    provider = data.get("provider", "custom")
+    if provider in PROVIDER_TEMPLATES and provider != "custom":
+        tmpl = PROVIDER_TEMPLATES[provider]
+        data.setdefault("imap_host", tmpl["imap_host"])
+        data.setdefault("imap_port", tmpl["imap_port"])
+        data.setdefault("smtp_host", tmpl["smtp_host"])
+        data.setdefault("smtp_port", tmpl["smtp_port"])
+
+    data.setdefault("name", email_addr.split("@")[0])
+    data.setdefault("imap_user", email_addr)
+    data.setdefault("smtp_user", email_addr)
+
+    try:
+        account_id = add_email_account(data)
+        return jsonify({"success": True, "account_id": account_id})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/accounts/<int:account_id>", methods=["PUT"])
+def api_update_account(account_id):
+    """Update an email account."""
+    data = request.get_json() or {}
+    acct = get_email_account(account_id)
+    if not acct:
+        return jsonify({"error": "Account not found"}), 404
+    try:
+        update_email_account(account_id, data)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/accounts/<int:account_id>", methods=["DELETE"])
+def api_delete_account(account_id):
+    """Delete an email account."""
+    acct = get_email_account(account_id)
+    if not acct:
+        return jsonify({"error": "Account not found"}), 404
+    delete_email_account(account_id)
+    return jsonify({"success": True})
+
+
+@app.route("/api/accounts/<int:account_id>/test", methods=["POST"])
+def api_test_account(account_id):
+    """Test connection for a specific email account."""
+    acct = get_email_account(account_id)
+    if not acct:
+        return jsonify({"error": "Account not found"}), 404
+    try:
+        import imaplib
+        imap = imaplib.IMAP4_SSL(acct["imap_host"], acct["imap_port"])
+        imap.login(acct["imap_user"], acct["imap_pass"])
+        imap.select("INBOX", readonly=True)
+        status, messages = imap.search(None, "ALL")
+        msg_count = len(messages[0].split()) if messages[0] else 0
+        imap.logout()
+        return jsonify({
+            "success": True,
+            "message": f"Connected to {acct['imap_host']} — {msg_count} messages in INBOX"
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+# ── Quote Proxy (ZenQuotes) ──────────────────────────────────────────
+
+@app.route("/api/quote")
+def api_quote():
+    """Proxy to ZenQuotes API to avoid CORS issues from browser"""
+    import urllib.request
+    try:
+        req = urllib.request.Request(
+            "https://zenquotes.io/api/random",
+            headers={"User-Agent": "MailAI/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+            if data and len(data) > 0:
+                return jsonify({"text": data[0].get("q", ""), "author": data[0].get("a", "Unknown")})
+    except Exception as e:
+        print(f"[quote] ZenQuotes error: {e}")
+    # Fallback quotes
+    import random
+    fallbacks = [
+        {"text": "The only way to do great work is to love what you do.", "author": "Steve Jobs"},
+        {"text": "Innovation distinguishes between a leader and a follower.", "author": "Steve Jobs"},
+        {"text": "Stay hungry, stay foolish.", "author": "Steve Jobs"},
+        {"text": "The future belongs to those who believe in the beauty of their dreams.", "author": "Eleanor Roosevelt"},
+        {"text": "It is during our darkest moments that we must focus to see the light.", "author": "Aristotle"},
+        {"text": "The best time to plant a tree was 20 years ago. The second best time is now.", "author": "Chinese Proverb"},
+        {"text": "Your time is limited, don't waste it living someone else's life.", "author": "Steve Jobs"},
+        {"text": "Believe you can and you're halfway there.", "author": "Theodore Roosevelt"},
+    ]
+    return jsonify(random.choice(fallbacks))
 
 
 # ── Main ─────────────────────────────────────────────────────────────

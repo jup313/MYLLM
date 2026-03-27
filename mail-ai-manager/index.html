@@ -81,6 +81,16 @@
   .pill-urgent{background:rgba(248,113,113,.1);color:var(--red)}
   .pill-personal{background:rgba(167,139,250,.1);color:var(--purple)}
   .pill-notification{background:rgba(45,212,191,.1);color:var(--teal)}
+  .pill-important{background:rgba(248,113,113,.12);color:var(--red);border:1px solid rgba(248,113,113,.25)}
+  .pill-not_important{background:rgba(100,116,139,.1);color:var(--dim)}
+  /* Reclassify dropdown */
+  .reclass-wrap{position:relative;display:inline-block}
+  .reclass-menu{display:none;position:absolute;top:100%;left:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 0;z-index:50;min-width:160px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .reclass-menu.open{display:block}
+  .reclass-menu .rc-item{padding:7px 14px;font-size:12px;cursor:pointer;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .reclass-menu .rc-item:hover{background:var(--surface2);color:var(--text)}
+  .reclass-menu .rc-divider{height:1px;background:var(--border);margin:4px 0}
+  .reclass-menu .rc-header{padding:5px 14px;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
   /* Alerts */
   .alert{padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:16px}
   .alert-info{background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.2);color:#93c5fd}
@@ -137,11 +147,13 @@
     <p>macOS Mail AI Manager</p>
   </div>
   <nav class="sidebar-nav">
-    <div class="nav-item active" onclick="showPage('setup')" id="nav-setup">⚙️ Setup</div>
+    <div class="nav-item active" onclick="showPage('welcome')" id="nav-welcome">🏠 Home</div>
+    <div class="nav-item" onclick="showPage('setup')" id="nav-setup">⚙️ Setup</div>
     <div class="nav-item" onclick="showPage('inbox')" id="nav-inbox">📥 Inbox</div>
     <div class="nav-item" onclick="showPage('queue')" id="nav-queue">⏳ Approval Queue <span class="badge" id="queue-badge" style="display:none">0</span></div>
     <div class="nav-item" onclick="showPage('summaries')" id="nav-summaries">📊 Summaries</div>
     <div class="nav-item" onclick="showPage('logs')" id="nav-logs">📋 Logs</div>
+    <div class="nav-item" onclick="showPage('accounts')" id="nav-accounts">📬 Accounts</div>
     <div class="nav-item" onclick="showPage('calendar')" id="nav-calendar">📅 Calendar</div>
     <div class="nav-item" onclick="showPage('settings')" id="nav-settings">🔧 Settings</div>
   </nav>
@@ -154,8 +166,29 @@
 <!-- MAIN CONTENT -->
 <div id="main">
 
+  <!-- ══ WELCOME PAGE ══ -->
+  <div id="page-welcome" class="page active">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;text-align:center;padding:20px">
+      <div style="font-size:60px;margin-bottom:10px" id="welcome-emoji">☀️</div>
+      <div style="font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:.15em;margin-bottom:8px" id="welcome-date"></div>
+      <div style="font-size:48px;font-weight:700;color:var(--text);margin-bottom:4px" id="welcome-time"></div>
+      <div style="font-size:26px;font-weight:600;margin-bottom:28px" id="welcome-greeting" style="color:var(--green)"></div>
+      <div class="card" style="max-width:560px;width:100%;text-align:center;padding:28px 32px;position:relative">
+        <div style="font-size:32px;margin-bottom:12px">💬</div>
+        <div style="font-size:16px;color:var(--text);line-height:1.7;font-style:italic" id="welcome-quote">Loading today's inspiration...</div>
+        <div style="font-size:13px;color:var(--dim);margin-top:12px" id="welcome-quote-author"></div>
+        <button class="btn btn-gray btn-sm" style="margin-top:14px" onclick="fetchQuote(true)">🔄 New Quote</button>
+      </div>
+      <div class="stats-grid" style="max-width:560px;width:100%;margin-top:24px" id="welcome-stats"></div>
+      <div style="margin-top:20px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:12px;color:var(--dim)">Show welcome page on startup</span>
+        <label class="toggle"><input type="checkbox" id="welcome-toggle" checked onchange="toggleWelcomePage(this.checked)"><span class="toggle-slider"></span></label>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ SETUP PAGE ══ -->
-  <div id="page-setup" class="page active">
+  <div id="page-setup" class="page" style="display:none">
     <div class="page-header">
       <div><div class="page-title">⚙️ Setup</div><div class="page-subtitle">Configure Mail AI Manager — all credentials stay local</div></div>
     </div>
@@ -170,53 +203,42 @@
       <div class="wizard-step" id="wstep-4">4. Connect Email</div>
     </div>
 
-    <!-- Step 1: Email Account Setup — macOS Mail.app -->
+    <!-- Step 1: Email Account Setup — IMAP -->
     <div class="step-content active" id="step-1">
       <div class="card">
-        <div class="card-title">🍎 Connect to macOS Mail.app</div>
-        <div class="alert alert-success" style="border-color:rgba(74,222,128,.3)">
-          <strong>No passwords needed!</strong> Mail AI Manager reads directly from your macOS Mail.app.<br>
-          All accounts already configured in Mail.app (Gmail, iCloud, Outlook, etc.) will be available automatically.
+        <div class="card-title">📧 Connect Email via IMAP</div>
+        <div class="alert alert-info">
+          <strong>Works with any email provider!</strong> Gmail, iCloud, Outlook, Yahoo, etc.<br>
+          For Gmail, you'll need an <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:var(--blue)">App Password</a> (Google Account → Security → App Passwords).
         </div>
-        <div style="text-align:center;padding:20px 0">
-          <div style="font-size:48px;margin-bottom:12px">📮</div>
-          <div style="font-size:15px;color:var(--text);margin-bottom:6px">Click below to connect to your macOS Mail.app</div>
-          <div style="font-size:12px;color:var(--dim);margin-bottom:20px">Make sure Mail.app is open with at least one account configured</div>
-          <button class="btn btn-green" onclick="testMailAppConnection()" style="font-size:15px;padding:12px 28px" id="connect-mail-btn">🔗 Connect to Mail.app</button>
-          <div id="email-test-result" style="font-size:13px;margin-top:12px"></div>
-          <div id="mail-accounts-list" style="margin-top:16px;display:none"></div>
-        </div>
-        <div class="divider"></div>
-        <!-- Advanced: IMAP fallback -->
-        <details style="margin-top:8px">
-          <summary style="cursor:pointer;color:var(--dim);font-size:12px;user-select:none">⚙️ Advanced: Use IMAP instead (requires app-specific password)</summary>
-          <div style="margin-top:12px">
-            <div class="form-row">
-              <div class="form-group">
-                <label>Email Address</label>
-                <input type="email" id="gmail_address" placeholder="you@gmail.com">
-              </div>
-              <div class="form-group">
-                <label>IMAP Server</label>
-                <input type="text" id="imap_host" placeholder="imap.gmail.com">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>IMAP Port</label>
-                <input type="number" id="imap_port" value="993" min="1" max="65535">
-              </div>
-              <div class="form-group">
-                <label>App Password</label>
-                <input type="password" id="imap_password" placeholder="App-specific password">
-              </div>
-            </div>
-            <div style="display:flex;justify-content:flex-end;gap:10px">
-              <button class="btn btn-gray btn-sm" onclick="testImapConnection()">🔍 Test IMAP</button>
-              <span id="imap-test-result" style="font-size:13px"></span>
-            </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email Address</label>
+            <input type="email" id="gmail_address" placeholder="you@gmail.com">
           </div>
-        </details>
+          <div class="form-group">
+            <label>IMAP Server</label>
+            <input type="text" id="imap_host" placeholder="imap.gmail.com" value="imap.gmail.com">
+            <div class="hint">Gmail: imap.gmail.com · iCloud: imap.mail.me.com · Outlook: outlook.office365.com</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>IMAP Port</label>
+            <input type="number" id="imap_port" value="993" min="1" max="65535">
+          </div>
+          <div class="form-group">
+            <label>App Password</label>
+            <input type="password" id="imap_password" placeholder="App-specific password">
+            <div class="hint">For Gmail: <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:var(--blue)">Generate App Password here ↗</a></div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+          <button class="btn btn-green" onclick="testImapConnection()" id="connect-mail-btn" style="font-size:14px;padding:10px 24px">🔗 Test & Connect</button>
+          <span id="imap-test-result" style="font-size:13px"></span>
+        </div>
+        <div id="email-test-result" style="font-size:13px;margin-top:8px"></div>
+        <div id="mail-accounts-list" style="margin-top:16px;display:none"></div>
         <div style="display:flex;justify-content:flex-end;margin-top:16px">
           <button class="btn btn-blue" onclick="nextStep(2)">Next: LLM Settings →</button>
         </div>
@@ -488,9 +510,30 @@
       </div>
     </div>
 
-    <div id="cal-auth-warn" class="alert alert-warn" style="display:none">
-      ⚠️ <strong>Calendar not authorized.</strong> You need to re-connect Gmail with Calendar scope enabled.
-      <button class="btn btn-blue btn-sm" style="margin-left:10px" onclick="startAuth()">🔗 Re-connect Gmail</button>
+    <!-- CalDAV status banner — shown when calendar is not yet connected -->
+    <div id="cal-caldav-notice" style="display:none">
+      <div class="card" style="border:1px solid var(--blue);background:linear-gradient(135deg, rgba(59,130,246,0.05), rgba(99,102,241,0.05))">
+        <div style="display:flex;align-items:flex-start;gap:15px">
+          <div style="font-size:36px">📅</div>
+          <div style="flex:1">
+            <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px">Google Calendar via CalDAV</div>
+            <div id="cal-caldav-status-msg" style="color:var(--muted);line-height:1.6;margin-bottom:12px">
+              Calendar uses your <strong>existing email credentials</strong> (App Password) to connect via CalDAV — no extra setup needed!
+            </div>
+            <div id="cal-setup-status" style="margin-bottom:12px"></div>
+            <button class="btn btn-gray btn-sm" onclick="checkCalendarSetup()">🔄 Re-check Connection</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Still show meeting detection even without Calendar connected -->
+      <div class="card" style="margin-top:15px">
+        <div class="card-title">📧 Emails with Meeting Language</div>
+        <div class="page-subtitle" style="margin-bottom:10px">These emails appear to contain meetings/appointments (detected locally)</div>
+        <div id="cal-meeting-emails-imap">
+          <div class="empty-state"><div class="icon">📧</div><div>Loading...</div></div>
+        </div>
+      </div>
     </div>
 
     <!-- Manual Event Form -->
@@ -549,6 +592,89 @@
     </div>
   </div>
 
+  <!-- ══ ACCOUNTS PAGE ══ -->
+  <div id="page-accounts" class="page" style="display:none">
+    <div class="page-header">
+      <div><div class="page-title">📬 Email Accounts</div><div class="page-subtitle">Manage multiple email providers — Gmail, iCloud, Outlook, Yahoo &amp; more</div></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-gray btn-sm" onclick="loadAccounts()">🔄 Refresh</button>
+        <button class="btn btn-green btn-sm" onclick="showAddAccountForm()">➕ Add Account</button>
+      </div>
+    </div>
+
+    <!-- LLM Learning Stats -->
+    <div class="card" id="feedback-stats-card">
+      <div class="card-title">🧠 AI Learning Stats</div>
+      <div id="feedback-stats-content" style="display:flex;gap:20px;flex-wrap:wrap">
+        <div class="stat-card" style="flex:1;min-width:120px"><div class="stat-number text-green" id="fb-accuracy">—</div><div class="stat-label">AI Accuracy</div></div>
+        <div class="stat-card" style="flex:1;min-width:120px"><div class="stat-number" style="color:var(--blue)" id="fb-corrections">0</div><div class="stat-label">Corrections Made</div></div>
+        <div class="stat-card" style="flex:1;min-width:120px"><div class="stat-number" style="color:var(--purple)" id="fb-rules">0</div><div class="stat-label">Learned Rules</div></div>
+      </div>
+    </div>
+
+    <!-- Add Account Form -->
+    <div id="add-account-form" style="display:none" class="card">
+      <div class="card-title">➕ Add Email Account</div>
+      <div class="form-group">
+        <label>Provider</label>
+        <select id="acct-provider" onchange="onProviderChange()">
+          <option value="gmail">📧 Gmail</option>
+          <option value="icloud">🍎 iCloud</option>
+          <option value="outlook">📨 Outlook / Hotmail</option>
+          <option value="yahoo">🟣 Yahoo Mail</option>
+          <option value="custom">⚙️ Custom IMAP</option>
+        </select>
+      </div>
+      <div id="acct-provider-notes" class="alert alert-info" style="font-size:12px"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="acct-email" placeholder="you@example.com">
+        </div>
+        <div class="form-group">
+          <label>Display Name</label>
+          <input type="text" id="acct-name" placeholder="My Gmail">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>IMAP Host</label>
+          <input type="text" id="acct-imap-host" placeholder="imap.gmail.com">
+        </div>
+        <div class="form-group">
+          <label>IMAP Port</label>
+          <input type="number" id="acct-imap-port" value="993">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>App Password</label>
+        <input type="password" id="acct-password" placeholder="App-specific password">
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button class="btn btn-green" onclick="addAccount()">✅ Add Account</button>
+        <button class="btn btn-gray" onclick="hideAddAccountForm()">Cancel</button>
+        <span id="acct-add-result" style="font-size:13px"></span>
+      </div>
+    </div>
+
+    <!-- Accounts List -->
+    <div class="card">
+      <div class="card-title">📧 Connected Accounts</div>
+      <div id="accounts-list">
+        <div class="empty-state"><div class="icon">📬</div><div>No additional accounts — add one above</div></div>
+      </div>
+    </div>
+
+    <!-- Learned Sender Rules -->
+    <div class="card">
+      <div class="card-title">📚 Learned Sender Rules</div>
+      <div style="font-size:12px;color:var(--dim);margin-bottom:12px">Rules automatically created from your corrections — the AI uses these to classify future emails faster</div>
+      <div id="sender-rules-list">
+        <div class="empty-state"><div class="icon">🧠</div><div>No rules yet — correct email classifications to teach the AI</div></div>
+      </div>
+    </div>
+  </div>
+
 </div><!-- end #main -->
 </div><!-- end #app -->
 
@@ -565,7 +691,8 @@
     <div class="modal-body">
       <div id="modal-classification"></div>
       <div class="divider"></div>
-      <div style="font-size:13px;color:var(--muted);line-height:1.7;max-height:200px;overflow-y:auto" id="modal-body"></div>
+      <div id="modal-body-text" style="font-size:13px;color:var(--muted);line-height:1.7;max-height:200px;overflow-y:auto;white-space:pre-wrap"></div>
+      <iframe id="modal-body-iframe" style="display:none;width:100%;min-height:200px;max-height:300px;border:1px solid var(--border);border-radius:8px;background:#fff"></iframe>
       <div id="modal-draft-section" style="display:none">
         <div class="divider"></div>
         <div style="font-size:12px;color:var(--dim);margin-bottom:8px;text-transform:uppercase;font-weight:600">✍️ AI Draft Reply</div>
@@ -765,12 +892,20 @@ async function testImapConnection() {
 }
 
 async function testEmailConnection() {
-  // Default to macOS Mail.app mode
-  testMailAppConnection();
+  // Use IMAP mode (primary)
+  testImapConnection();
 }
 
 async function checkAuthStatus() {
-  testMailAppConnection();
+  // Check if IMAP is already configured
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    if (d.authenticated) {
+      document.getElementById('auth-not-connected').style.display = 'none';
+      document.getElementById('auth-connected').style.display = 'block';
+    }
+  } catch(e) {}
 }
 
 async function disconnectEmail() {
@@ -888,7 +1023,8 @@ async function openEmail(id) {
       <span style="color:var(--dim)">Action: <b>${actionIcon(e.llm_action)} ${e.llm_action||'—'}</b></span>
       ${e.unsubscribe_url ? `<span style="color:var(--yellow)">🔗 Has unsubscribe link</span>` : ''}
     </div>`;
-  document.getElementById('modal-body').textContent = e.body || e.snippet || '(no body)';
+  // Show body — prefer raw HTML if available, fallback to plain text
+  _showModalBody(e.body || e.snippet || '(no body)', e.body_html || null);
   // Draft section
   const draftSection = document.getElementById('modal-draft-section');
   if (e.draft_reply) {
@@ -1173,6 +1309,79 @@ async function saveSettings() {
 }
 
 
+// ─── Show Modal Body (HTML-aware) ──────────────────────────────────
+function _cleanBodyText(text) {
+  if (!text) return text;
+
+  // --- CSS removal ---
+  // Remove @media blocks (with nested braces): @media ... { ... { ... } ... }
+  text = text.replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/gi, '');
+  // Remove CSS rule blocks: selector { properties }  e.g. td { mso-line-height-rule:exactly; }
+  text = text.replace(/[a-z.#][a-z0-9.#_,:\s-]*\{[^}]{0,500}\}/gi, '');
+  // Remove leftover CSS !important and related
+  text = text.replace(/!\s*important\s*;?/gi, '');
+
+  // --- HTML artifact removal ---
+  // Remove garbled tracking pixel remnants: 327&lctg=&stpe=pixel" width="2" height="6" border="0" />
+  text = text.replace(/\d*&[a-z]+=&[a-z]+=[^"]*"[^/]*\/?>/gi, '');
+  // Remove stray self-closing tag remnants like /> or " />
+  text = text.replace(/"\s*\/>/g, '');
+  // Remove orphaned HTML attributes: width="..." height="..." border="..." etc.
+  text = text.replace(/\b(?:width|height|border|style|class|alt|src|rel|target|cellpadding|cellspacing|bgcolor|valign|align)\s*=\s*"[^"]*"/gi, '');
+  // Remove HTML comments
+  text = text.replace(/<!--[\s\S]*?-->/g, '');
+  // Remove any remaining HTML tags
+  text = text.replace(/<[^>]+>/g, ' ');
+
+  // --- URL cleanup ---
+  // Convert <https://...> angle-bracket URLs to plain text
+  text = text.replace(/<(https?:\/\/[^>]+)>/g, '$1');
+  // Remove long tracking URLs (>120 chars) wrapped in parens
+  text = text.replace(/\(\s*https?:\/\/\S{120,}\s*\)/g, '');
+  // Replace standalone long tracking URLs (>120 chars) with [link]
+  text = text.replace(/https?:\/\/\S{120,}/g, '[link]');
+  // Remove tracking URL fragments (sli.* trackers)
+  text = text.replace(/https?:\/\/sli\.\S+/gi, '');
+  // Remove [URL] style link references
+  text = text.replace(/\[https?:\/\/[^\]]+\]/g, '');
+
+  // --- Whitespace cleanup ---
+  text = text.replace(/[ \t]+/g, ' ');
+  text = text.replace(/ *\n */g, '\n');
+  text = text.replace(/\n{3,}/g, '\n\n');
+  return text.trim();
+}
+
+function _showModalBody(textContent, htmlContent) {
+  const textEl = document.getElementById('modal-body-text');
+  const iframeEl = document.getElementById('modal-body-iframe');
+  // Prefer raw HTML version if available (rendered in sandboxed iframe)
+  if (htmlContent) {
+    textEl.style.display = 'none';
+    textEl.textContent = '';
+    iframeEl.style.display = 'block';
+    iframeEl.style.minHeight = '300px';
+    iframeEl.style.maxHeight = '500px';
+    const blob = new Blob([htmlContent], {type: 'text/html'});
+    iframeEl.src = URL.createObjectURL(blob);
+  } else if (textContent && /<[a-z][\s\S]*>/i.test(textContent)) {
+    // Fallback: body text itself contains HTML (old emails before body_html was added)
+    textEl.style.display = 'none';
+    textEl.textContent = '';
+    iframeEl.style.display = 'block';
+    iframeEl.style.minHeight = '300px';
+    iframeEl.style.maxHeight = '500px';
+    const blob = new Blob([textContent], {type: 'text/html'});
+    iframeEl.src = URL.createObjectURL(blob);
+  } else {
+    // Plain text — clean up garbled HTML artifacts and display
+    iframeEl.style.display = 'none';
+    iframeEl.src = 'about:blank';
+    textEl.style.display = 'block';
+    textEl.textContent = _cleanBodyText(textContent) || '(no body)';
+  }
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────
 
 function esc(s) {
@@ -1212,35 +1421,106 @@ function showToast(msg, err=false) {
 
 async function loadCalendarEvents() {
   const listEl = document.getElementById('cal-events-list');
+  const caldavNoticeEl = document.getElementById('cal-caldav-notice');
   listEl.innerHTML = '<div class="empty-state"><div class="icon spin">⏳</div><div>Loading...</div></div>';
   try {
-    // Check auth
+    // Check CalDAV auth status
     const authR = await fetch('/api/calendar/status');
     const authD = await authR.json();
-    document.getElementById('cal-auth-warn').style.display = authD.authorized ? 'none' : 'block';
-    if (!authD.authorized) { listEl.innerHTML = '<div class="empty-state"><div>Re-connect Gmail to enable Calendar.</div></div>'; return; }
 
-    const r = await fetch('/api/calendar/events?days=7');
-    const d = await r.json();
-    if (!d.events || d.events.length === 0) {
-      listEl.innerHTML = '<div class="empty-state"><div class="icon">📅</div><div>No upcoming events in the next 7 days</div></div>';
-      return;
+    if (authD.authorized) {
+      // Calendar is authorized via CalDAV — normal flow
+      caldavNoticeEl.style.display = 'none';
+      listEl.closest('.card').style.display = '';
+      document.getElementById('cal-meeting-emails').closest('.card').style.display = '';
+      const r = await fetch('/api/calendar/events?days=7');
+      const d = await r.json();
+      if (!d.events || d.events.length === 0) {
+        listEl.innerHTML = '<div class="empty-state"><div class="icon">📅</div><div>No upcoming events in the next 7 days</div></div>';
+      } else {
+        listEl.innerHTML = d.events.map(e => {
+          const start = e.start ? new Date(e.start).toLocaleString('en-US', {weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+          return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">
+            <div>
+              <div style="font-weight:600;color:var(--text)">${esc(e.title)}</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:2px">🕐 ${start}${e.location ? ' · 📍 ' + esc(e.location) : ''}</div>
+            </div>
+            ${e.link ? `<a href="${e.link}" target="_blank" class="btn btn-gray btn-sm" style="text-decoration:none">Open ↗</a>` : ''}
+          </div>`;
+        }).join('');
+      }
+      // Also load meeting emails
+      loadMeetingEmails();
+    } else {
+      // Not authorized — show CalDAV notice with helpful info
+      caldavNoticeEl.style.display = 'block';
+      // Hide the "Upcoming Events" and "Meeting Emails" cards
+      listEl.closest('.card').style.display = 'none';
+      document.getElementById('cal-meeting-emails').closest('.card').style.display = 'none';
+      // Check setup status
+      checkCalendarSetup();
+      // Load meeting emails in the notice section
+      loadMeetingEmailsImap();
     }
-    listEl.innerHTML = d.events.map(e => {
-      const start = e.start ? new Date(e.start).toLocaleString('en-US', {weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
-      return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">
-        <div>
-          <div style="font-weight:600;color:var(--text)">${esc(e.title)}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px">🕐 ${start}${e.location ? ' · 📍 ' + esc(e.location) : ''}</div>
-        </div>
-        ${e.link ? `<a href="${e.link}" target="_blank" class="btn btn-gray btn-sm" style="text-decoration:none">Open ↗</a>` : ''}
-      </div>`;
-    }).join('');
   } catch(err) {
     listEl.innerHTML = `<div class="alert alert-error">❌ ${err.message}</div>`;
   }
-  // Also load meeting emails
-  loadMeetingEmails();
+}
+
+async function checkCalendarSetup() {
+  const statusEl = document.getElementById('cal-setup-status');
+  const msgEl = document.getElementById('cal-caldav-status-msg');
+  try {
+    const r = await fetch('/api/calendar/status');
+    const d = await r.json();
+    let html = '';
+    if (d.authorized) {
+      html = '<div style="color:var(--green);font-size:14px;font-weight:600">✅ Google Calendar is connected via CalDAV!</div>';
+      if (msgEl) msgEl.innerHTML = 'Calendar is connected using your email credentials via CalDAV. Everything is working!';
+    } else if (d.has_imap_creds) {
+      html = '<div style="color:var(--yellow);font-size:13px">⚠️ IMAP credentials found but CalDAV connection failed.</div>';
+      html += '<div style="color:var(--muted);font-size:12px;margin-top:6px">Make sure your Gmail App Password is correct and that Google Calendar access is enabled for your account.</div>';
+      if (d.error) html += `<div style="color:var(--red);font-size:12px;margin-top:4px">Error: ${esc(d.error)}</div>`;
+      if (msgEl) msgEl.innerHTML = 'Your email credentials were found but the CalDAV connection could not be established. Check that your <strong>App Password</strong> is valid and try again.';
+    } else {
+      html = '<div style="color:var(--yellow);font-size:13px">⚠️ No email credentials configured yet.</div>';
+      html += '<div style="color:var(--muted);font-size:12px;margin-top:4px">Go to <strong>Setup</strong> and connect your email account first — Calendar will use the same credentials automatically.</div>';
+      if (msgEl) msgEl.innerHTML = 'Calendar uses your <strong>existing email credentials</strong> (App Password) to connect via CalDAV. Set up your email account first in <strong>Setup</strong>.';
+    }
+    statusEl.innerHTML = html;
+  } catch(e) {
+    statusEl.innerHTML = `<div style="color:var(--red);font-size:13px">❌ Error checking setup: ${e.message}</div>`;
+  }
+}
+
+async function loadMeetingEmailsImap() {
+  const el = document.getElementById('cal-meeting-emails-imap');
+  try {
+    const r = await fetch('/api/emails?limit=50');
+    const d = await r.json();
+    const meetings = [];
+    for (const email of (d.emails||[])) {
+      const body = (email.body||'') + ' ' + (email.subject||'');
+      if (/meeting|appointment|call|interview|zoom|webinar|schedule|invite|monday|tuesday|wednesday|thursday|friday|tomorrow|next week|\d{1,2}:\d{2}\s*(am|pm)/i.test(body)) {
+        meetings.push(email);
+      }
+    }
+    if (meetings.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div>No emails with meeting language detected</div></div>';
+      return;
+    }
+    el.innerHTML = meetings.map(e => `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.subject||'(no subject)')}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(e.sender||'')} · ${(e.date||'').substring(0,10)}</div>
+          <div style="font-size:12px;color:var(--dim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((e.body||e.snippet||'').substring(0,120))}</div>
+        </div>
+        <button class="btn btn-gray btn-sm" style="flex-shrink:0" onclick="openEmail('${e.id}')">👁 View</button>
+      </div>`).join('');
+  } catch(err) {
+    el.innerHTML = `<div class="alert alert-error">❌ ${err.message}</div>`;
+  }
 }
 
 async function loadMeetingEmails() {
@@ -1351,6 +1631,8 @@ window.showPage = function(name) {
   if (name === 'logs') loadLogs();
   if (name === 'settings') loadSettings();
   if (name === 'calendar') loadCalendarEvents();
+  if (name === 'accounts') { loadAccounts(); loadFeedbackStats(); loadSenderRules(); }
+  if (name === 'welcome') initWelcomePage();
 };
 
 // Check for OAuth callback params
@@ -1364,6 +1646,345 @@ if (params.get('auth_error')) {
   showToast('❌ Auth error: ' + params.get('auth_error'), true);
   history.replaceState({}, '', '/');
 }
+
+// ─── Accounts & Multi-Provider ─────────────────────────────────────
+let providerTemplates = {};
+
+async function loadAccounts() {
+  try {
+    const pr = await fetch('/api/providers');
+    providerTemplates = (await pr.json()).providers || {};
+  } catch(e) {}
+  try {
+    const r = await fetch('/api/accounts');
+    const d = await r.json();
+    const el = document.getElementById('accounts-list');
+    if (!d.accounts || d.accounts.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">📬</div><div>No additional accounts — click ➕ Add Account above</div></div>';
+      return;
+    }
+    el.innerHTML = d.accounts.map(a => {
+      const prov = providerTemplates[a.provider] || {};
+      const provName = prov.name || a.provider || 'Custom';
+      const status = a.enabled ? '<span class="status-dot green"></span>Enabled' : '<span class="status-dot red"></span>Disabled';
+      const lastSync = a.last_sync ? a.last_sync.substring(0,16) : 'Never';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-weight:600;color:var(--text)">${esc(a.name||a.email)} <span class="pill pill-work" style="margin-left:6px">${provName}</span></div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(a.email)} · ${a.imap_host}:${a.imap_port} · ${status}</div>
+          <div style="font-size:11px;color:var(--dim);margin-top:2px">Last sync: ${lastSync}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-blue btn-sm" onclick="testAccount(${a.id},this)">🔗 Test</button>
+          <button class="btn btn-red btn-sm" onclick="deleteAccount(${a.id})">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+
+function showAddAccountForm() {
+  document.getElementById('add-account-form').style.display = 'block';
+  document.getElementById('acct-add-result').innerHTML = '';
+  onProviderChange();
+}
+function hideAddAccountForm() { document.getElementById('add-account-form').style.display = 'none'; }
+
+function onProviderChange() {
+  const prov = document.getElementById('acct-provider').value;
+  const tmpl = providerTemplates[prov] || {};
+  document.getElementById('acct-imap-host').value = tmpl.imap_host || '';
+  document.getElementById('acct-imap-port').value = tmpl.imap_port || 993;
+  document.getElementById('acct-provider-notes').innerHTML = tmpl.notes || 'Enter your IMAP details below.';
+}
+
+async function addAccount() {
+  const resEl = document.getElementById('acct-add-result');
+  const email = document.getElementById('acct-email').value.trim();
+  if (!email) { resEl.innerHTML = '<span class="text-red">❌ Email required</span>'; return; }
+  const body = {
+    email, provider: document.getElementById('acct-provider').value,
+    name: document.getElementById('acct-name').value.trim() || email.split('@')[0],
+    imap_host: document.getElementById('acct-imap-host').value,
+    imap_port: parseInt(document.getElementById('acct-imap-port').value) || 993,
+    imap_pass: document.getElementById('acct-password').value,
+  };
+  resEl.innerHTML = '<span class="text-muted">⏳ Adding...</span>';
+  try {
+    const r = await fetch('/api/accounts', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const d = await r.json();
+    if (d.success) { resEl.innerHTML = '<span class="text-green">✅ Account added!</span>'; loadAccounts(); setTimeout(hideAddAccountForm, 1500); }
+    else resEl.innerHTML = `<span class="text-red">❌ ${d.error}</span>`;
+  } catch(e) { resEl.innerHTML = `<span class="text-red">❌ ${e.message}</span>`; }
+}
+
+async function testAccount(id, btn) {
+  btn.disabled = true; btn.textContent = '⏳...';
+  try {
+    const r = await fetch(`/api/accounts/${id}/test`, {method:'POST'});
+    const d = await r.json();
+    btn.textContent = d.success ? '✅ OK' : '❌ Fail';
+    btn.disabled = false;
+    showToast(d.success ? d.message : ('❌ ' + d.error), !d.success);
+    setTimeout(() => { btn.textContent = '🔗 Test'; }, 2000);
+  } catch(e) { btn.textContent = '🔗 Test'; btn.disabled = false; }
+}
+
+async function deleteAccount(id) {
+  if (!confirm('Delete this account?')) return;
+  await fetch(`/api/accounts/${id}`, {method:'DELETE'});
+  showToast('Account deleted'); loadAccounts();
+}
+
+// ─── Feedback & Sender Rules ───────────────────────────────────────
+async function loadFeedbackStats() {
+  try {
+    const r = await fetch('/api/feedback/stats');
+    const d = await r.json();
+    document.getElementById('fb-accuracy').textContent = d.accuracy_pct + '%';
+    document.getElementById('fb-corrections').textContent = d.total_corrections;
+    const rr = await fetch('/api/feedback/rules');
+    const rd = await rr.json();
+    document.getElementById('fb-rules').textContent = (rd.rules||[]).length;
+  } catch(e) {}
+}
+
+async function loadSenderRules() {
+  try {
+    const r = await fetch('/api/feedback/rules');
+    const d = await r.json();
+    const el = document.getElementById('sender-rules-list');
+    if (!d.rules || d.rules.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">🧠</div><div>No rules yet — correct email classifications to teach the AI</div></div>';
+      return;
+    }
+    el.innerHTML = '<table style="width:100%"><thead><tr><th>Sender</th><th>Category</th><th>Importance</th><th>Action</th><th>Uses</th></tr></thead><tbody>' +
+      d.rules.map(r => `<tr>
+        <td style="font-size:12px">${esc(r.sender_email)}</td>
+        <td><span class="pill pill-${r.default_category||'notification'}">${r.default_category||'—'}</span></td>
+        <td><span class="pill pill-${r.default_importance||'not_important'}">${r.default_importance==='important'?'🔴 Important':'⚪ Normal'}</span></td>
+        <td style="font-size:12px">${r.default_action||'—'}</td>
+        <td style="font-size:12px;font-weight:600">${r.hit_count}</td>
+      </tr>`).join('') + '</tbody></table>';
+  } catch(e) {}
+}
+
+// ─── Reclassification ──────────────────────────────────────────────
+async function reclassifyEmail(emailId, field, value) {
+  const body = {};
+  body[field] = value;
+  try {
+    const r = await fetch(`/api/emails/${emailId}/reclassify`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const d = await r.json();
+    if (d.success) { showToast(`✅ Reclassified: ${field} → ${value}`); loadInbox(); if (currentEmailId === emailId) openEmail(emailId); }
+    else showToast('❌ ' + (d.error||'Failed'), true);
+  } catch(e) { showToast('❌ ' + e.message, true); }
+}
+
+// Close open reclassify menus on click outside
+document.addEventListener('click', () => { document.querySelectorAll('.reclass-menu').forEach(m => m.classList.remove('open')); });
+
+// ─── Inbox override with importance + reclassify ───────────────────
+const _origLoadInbox = loadInbox;
+loadInbox = async function() {
+  const cat = document.getElementById('inbox-filter').value;
+  let url = '/api/emails?limit=100';
+  if (cat) url += '&category=' + cat;
+  try {
+    const r = await fetch(url);
+    const d = await r.json();
+    const tbody = document.getElementById('inbox-table');
+    if (!d.emails || d.emails.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">📭</div><div>No emails yet — run the pipeline to fetch &amp; classify</div></div></td></tr>';
+      return;
+    }
+    // Update header to include Importance column
+    const thead = tbody.closest('table').querySelector('thead tr');
+    thead.innerHTML = '<th>Importance</th><th>Category</th><th>Subject</th><th>From</th><th>Confidence</th><th>Action</th><th>Date</th><th></th>';
+
+    tbody.innerHTML = d.emails.map(e => {
+      const cat = e.category || 'notification';
+      const imp = e.importance || 'not_important';
+      const impPill = imp === 'important'
+        ? '<span class="pill pill-important">🔴 Important</span>'
+        : '<span class="pill pill-not_important">⚪ Normal</span>';
+      const pill = `<span class="pill pill-${cat}">${catIcon(cat)} ${cat}</span>`;
+      const conf = e.confidence ? `${Math.round(e.confidence*100)}%` : '—';
+      const date = e.date ? e.date.substring(0,10) : '—';
+      const action = e.llm_action || '—';
+      const corrected = e.user_corrected ? ' <span title="User corrected" style="font-size:10px">✏️</span>' : '';
+      const eid = String(e.id).replace(/'/g, "\\'");
+      return `<tr>
+        <td>${impPill}</td>
+        <td>${pill}${corrected}</td>
+        <td><div class="truncate" style="max-width:250px;color:var(--text)">${esc(e.subject||'(no subject)')}</div></td>
+        <td><div class="truncate" style="max-width:150px">${esc(e.sender||e.sender_email||'?')}</div></td>
+        <td><span style="color:${confColor(e.confidence)}">${conf}</span></td>
+        <td><span style="font-size:12px">${actionIcon(action)} ${action}</span></td>
+        <td style="font-size:12px">${date}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-gray btn-sm" onclick="openEmail('${eid}')">View</button>
+          <div class="reclass-wrap" style="margin-left:4px">
+            <button class="btn btn-gray btn-sm" onclick="event.stopPropagation();this.nextElementSibling.classList.toggle('open')">✏️</button>
+            <div class="reclass-menu" onclick="event.stopPropagation()">
+              <div class="rc-header">Category</div>
+              <div class="rc-item" onclick="reclassifyEmail('${eid}','category','urgent')">🚨 Urgent</div>
+              <div class="rc-item" onclick="reclassifyEmail('${eid}','category','work')">💼 Work</div>
+              <div class="rc-item" onclick="reclassifyEmail('${eid}','category','personal')">👤 Personal</div>
+              <div class="rc-item" onclick="reclassifyEmail('${eid}','category','marketing')">📣 Marketing</div>
+              <div class="rc-item" onclick="reclassifyEmail('${eid}','category','spam')">🗑️ Spam</div>
+              <div class="rc-item" onclick="reclassifyEmail('${eid}','category','notification')">🔔 Notification</div>
+              <div class="rc-divider"></div>
+              <div class="rc-header">Importance</div>
+              <div class="rc-item" onclick="reclassifyEmail('${eid}','importance','important')">🔴 Important</div>
+              <div class="rc-item" onclick="reclassifyEmail('${eid}','importance','not_important')">⚪ Not Important</div>
+            </div>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+};
+
+// ─── Modal override with importance + reclassify ───────────────────
+const _origOpenEmail = openEmail;
+openEmail = async function(id) {
+  currentEmailId = id;
+  const r = await fetch('/api/emails/' + id);
+  const e = await r.json();
+  document.getElementById('modal-subject').textContent = e.subject || '(no subject)';
+  document.getElementById('modal-from').textContent = (e.sender||'') + ' · ' + (e.sender_email||'') + ' · ' + (e.date||'').substring(0,16);
+  const cat = e.category || 'notification';
+  const imp = e.importance || 'not_important';
+  const conf = e.confidence ? `${Math.round(e.confidence*100)}%` : '—';
+  const impPill = imp==='important' ? '<span class="pill pill-important">🔴 Important</span>' : '<span class="pill pill-not_important">⚪ Normal</span>';
+  document.getElementById('modal-classification').innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:13px;align-items:center">
+      ${impPill}
+      <span class="pill pill-${cat}">${catIcon(cat)} ${cat}</span>
+      <span style="color:var(--dim)">Confidence: <b style="color:${confColor(e.confidence)}">${conf}</b></span>
+      <span style="color:var(--dim)">Action: <b>${actionIcon(e.llm_action)} ${e.llm_action||'—'}</b></span>
+      ${e.importance_reason ? `<span style="color:var(--dim);font-size:11px" title="${esc(e.importance_reason)}">ℹ️ ${esc(e.importance_reason).substring(0,60)}</span>` : ''}
+      ${e.user_corrected ? '<span style="color:var(--yellow);font-size:11px">✏️ User corrected</span>' : ''}
+    </div>
+    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn btn-gray btn-sm" onclick="reclassifyEmail('${id}','importance','important')">🔴 Mark Important</button>
+      <button class="btn btn-gray btn-sm" onclick="reclassifyEmail('${id}','importance','not_important')">⚪ Not Important</button>
+      <button class="btn btn-gray btn-sm" onclick="reclassifyEmail('${id}','category','work')">💼 Work</button>
+      <button class="btn btn-gray btn-sm" onclick="reclassifyEmail('${id}','category','personal')">👤 Personal</button>
+      <button class="btn btn-gray btn-sm" onclick="reclassifyEmail('${id}','category','spam')">🗑️ Spam</button>
+    </div>`;
+  _showModalBody(e.body || e.snippet || '(no body)', e.body_html || null);
+  const draftSection = document.getElementById('modal-draft-section');
+  if (e.draft_reply) { draftSection.style.display = 'block'; document.getElementById('modal-draft-text').value = e.draft_reply; }
+  else draftSection.style.display = 'none';
+  document.getElementById('modal-actions').innerHTML = `
+    <button class="btn btn-gray btn-sm" onclick="closeModal()">Close</button>
+    <button class="btn btn-gray btn-sm" onclick="archiveEmail('${id}')">📦 Archive</button>
+    <button class="btn btn-red btn-sm" onclick="trashEmail('${id}')">🗑️ Trash</button>
+    ${!e.draft_reply ? `<button class="btn btn-blue btn-sm" onclick="generateDraftForEmail('${id}')">✍️ Generate Draft</button>` : ''}`;
+  document.getElementById('email-modal').style.display = 'flex';
+};
+
+// ─── Welcome Page ──────────────────────────────────────────────────
+let welcomeClockInterval = null;
+
+function initWelcomePage() {
+  updateWelcomeClock();
+  if (welcomeClockInterval) clearInterval(welcomeClockInterval);
+  welcomeClockInterval = setInterval(updateWelcomeClock, 1000);
+  fetchQuote(false);
+  loadWelcomeStats();
+  // Restore toggle state
+  const enabled = localStorage.getItem('mailai_welcome_enabled') !== 'false';
+  document.getElementById('welcome-toggle').checked = enabled;
+}
+
+function updateWelcomeClock() {
+  const now = new Date();
+  const hour = now.getHours();
+  // Time
+  document.getElementById('welcome-time').textContent = now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:true});
+  // Date
+  document.getElementById('welcome-date').textContent = now.toLocaleDateString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric'}).toUpperCase();
+  // Greeting & emoji
+  let greeting, emoji;
+  if (hour < 12) { greeting = 'Good Morning!'; emoji = '🌅'; }
+  else if (hour < 17) { greeting = 'Good Afternoon!'; emoji = '☀️'; }
+  else { greeting = 'Good Evening!'; emoji = '🌙'; }
+  document.getElementById('welcome-greeting').textContent = greeting;
+  document.getElementById('welcome-greeting').style.color = 'var(--green)';
+  document.getElementById('welcome-emoji').textContent = emoji;
+}
+
+async function fetchQuote(force) {
+  const cacheKey = 'mailai_quote';
+  const cacheTimeKey = 'mailai_quote_time';
+  const quoteEl = document.getElementById('welcome-quote');
+  const authorEl = document.getElementById('welcome-quote-author');
+  // Use cache if not forced and cached within 1 hour
+  if (!force) {
+    const cached = localStorage.getItem(cacheKey);
+    const cachedTime = parseInt(localStorage.getItem(cacheTimeKey) || '0');
+    if (cached && (Date.now() - cachedTime < 3600000)) {
+      try {
+        const q = JSON.parse(cached);
+        quoteEl.textContent = '"' + q.text + '"';
+        authorEl.textContent = '— ' + q.author;
+        return;
+      } catch(e) {}
+    }
+  }
+  quoteEl.textContent = '✨ Loading inspiration...';
+  authorEl.textContent = '';
+  try {
+    const r = await fetch('/api/quote');
+    const d = await r.json();
+    if (d.text) {
+      quoteEl.textContent = '"' + d.text + '"';
+      authorEl.textContent = '— ' + d.author;
+      localStorage.setItem(cacheKey, JSON.stringify(d));
+      localStorage.setItem(cacheTimeKey, String(Date.now()));
+    } else {
+      quoteEl.textContent = '"The only way to do great work is to love what you do."';
+      authorEl.textContent = '— Steve Jobs';
+    }
+  } catch(e) {
+    quoteEl.textContent = '"The only way to do great work is to love what you do."';
+    authorEl.textContent = '— Steve Jobs';
+  }
+}
+
+async function loadWelcomeStats() {
+  const el = document.getElementById('welcome-stats');
+  try {
+    const r = await fetch('/api/stats');
+    const d = await r.json();
+    el.innerHTML = `
+      <div class="stat-card" style="text-align:center"><div class="stat-number text-green">${d.total_emails||0}</div><div class="stat-label">📧 Total Emails</div></div>
+      <div class="stat-card" style="text-align:center"><div class="stat-number" style="color:var(--yellow)">${d.pending_actions||0}</div><div class="stat-label">⏳ Pending Actions</div></div>
+      <div class="stat-card" style="text-align:center"><div class="stat-number" style="color:var(--blue)">${Object.keys(d.by_category||{}).length}</div><div class="stat-label">📊 Categories</div></div>`;
+  } catch(e) {
+    el.innerHTML = '';
+  }
+}
+
+function toggleWelcomePage(enabled) {
+  localStorage.setItem('mailai_welcome_enabled', enabled ? 'true' : 'false');
+  if (!enabled) showToast('Welcome page disabled — will open to Inbox on next load');
+  else showToast('Welcome page enabled');
+}
+
+// ─── Startup: check welcome preference ─────────────────────────────
+(function() {
+  const welcomeEnabled = localStorage.getItem('mailai_welcome_enabled') !== 'false';
+  if (welcomeEnabled) {
+    initWelcomePage();
+  } else {
+    // Skip welcome, go to inbox
+    window.showPage('inbox');
+  }
+})();
 </script>
 </body>
 </html>

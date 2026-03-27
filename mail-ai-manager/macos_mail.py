@@ -12,12 +12,12 @@ from datetime import datetime
 from database import get_config, log_action
 
 
-def _run_applescript(script: str) -> str:
+def _run_applescript(script: str, timeout: int = 120) -> str:
     """Execute AppleScript and return output."""
     try:
         result = subprocess.run(
             ["osascript", "-e", script],
-            capture_output=True, text=True, timeout=30
+            capture_output=True, text=True, timeout=timeout
         )
         if result.returncode != 0:
             raise Exception(f"AppleScript error: {result.stderr.strip()}")
@@ -100,34 +100,40 @@ def get_accounts() -> list:
 
 
 def fetch_unread(max_results: int = 50) -> list:
-    """Fetch unread emails from Mail.app inbox."""
+    """Fetch unread emails from Mail.app inbox using fast index-based access."""
     try:
+        # Scan up to 200 recent messages by index to find unread ones
+        scan_limit = max_results * 4
+        if scan_limit < 200:
+            scan_limit = 200
         script = f'''
         tell application "Mail"
             set emailList to ""
-            set msgList to (messages of inbox whose read status is false)
-            set msgCount to count of msgList
-            if msgCount > {max_results} then set msgCount to {max_results}
-            repeat with i from 1 to msgCount
-                set msg to item i of msgList
-                set msgId to id of msg as text
-                set msgSubject to subject of msg
-                set msgSender to sender of msg
-                set msgDate to date received of msg as text
-                set msgRead to read status of msg as text
-                -- Get snippet (first 200 chars of content)
+            set foundCount to 0
+            set totalCount to count of messages of inbox
+            if totalCount > {scan_limit} then set totalCount to {scan_limit}
+            repeat with i from 1 to totalCount
+                if foundCount ≥ {max_results} then exit repeat
                 try
-                    set msgContent to content of msg
-                    if length of msgContent > 200 then
-                        set msgSnippet to text 1 thru 200 of msgContent
-                    else
-                        set msgSnippet to msgContent
+                    set msg to message i of inbox
+                    if read status of msg is false then
+                        set msgId to id of msg as text
+                        set msgSubject to subject of msg
+                        set msgSender to sender of msg
+                        set msgDate to date received of msg as text
+                        set msgSnippet to ""
+                        try
+                            set msgContent to content of msg
+                            if length of msgContent > 200 then
+                                set msgSnippet to text 1 thru 200 of msgContent
+                            else
+                                set msgSnippet to msgContent
+                            end if
+                        end try
+                        set emailList to emailList & msgId & "||SEP||" & msgSubject & "||SEP||" & msgSender & "||SEP||" & msgDate & "||SEP||" & msgSnippet & "||REC||"
+                        set foundCount to foundCount + 1
                     end if
-                on error
-                    set msgSnippet to ""
                 end try
-                -- Build delimited record
-                set emailList to emailList & msgId & "||SEP||" & msgSubject & "||SEP||" & msgSender & "||SEP||" & msgDate & "||SEP||" & msgSnippet & "||REC||"
             end repeat
             return emailList
         end tell
@@ -166,31 +172,31 @@ def fetch_unread(max_results: int = 50) -> list:
 
 
 def fetch_recent(max_results: int = 30) -> list:
-    """Fetch recent emails from Mail.app inbox."""
+    """Fetch recent emails from Mail.app inbox using fast index-based access."""
     try:
         script = f'''
         tell application "Mail"
             set emailList to ""
-            set msgList to messages of inbox
-            set msgCount to count of msgList
-            if msgCount > {max_results} then set msgCount to {max_results}
-            repeat with i from 1 to msgCount
-                set msg to item i of msgList
-                set msgId to id of msg as text
-                set msgSubject to subject of msg
-                set msgSender to sender of msg
-                set msgDate to date received of msg as text
+            set totalCount to count of messages of inbox
+            if totalCount > {max_results} then set totalCount to {max_results}
+            repeat with i from 1 to totalCount
                 try
-                    set msgContent to content of msg
-                    if length of msgContent > 200 then
-                        set msgSnippet to text 1 thru 200 of msgContent
-                    else
-                        set msgSnippet to msgContent
-                    end if
-                on error
+                    set msg to message i of inbox
+                    set msgId to id of msg as text
+                    set msgSubject to subject of msg
+                    set msgSender to sender of msg
+                    set msgDate to date received of msg as text
                     set msgSnippet to ""
+                    try
+                        set msgContent to content of msg
+                        if length of msgContent > 200 then
+                            set msgSnippet to text 1 thru 200 of msgContent
+                        else
+                            set msgSnippet to msgContent
+                        end if
+                    end try
+                    set emailList to emailList & msgId & "||SEP||" & msgSubject & "||SEP||" & msgSender & "||SEP||" & msgDate & "||SEP||" & msgSnippet & "||REC||"
                 end try
-                set emailList to emailList & msgId & "||SEP||" & msgSubject & "||SEP||" & msgSender & "||SEP||" & msgDate & "||SEP||" & msgSnippet & "||REC||"
             end repeat
             return emailList
         end tell
