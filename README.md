@@ -139,7 +139,7 @@ python main.py
 Local AI that classifies, summarizes, categorizes, and drafts replies to your emails.
 
 ```bash
-cd gmail-ai-manager
+cd mail-ai-manager
 python3 app.py
 # Open: http://localhost:5051
 ```
@@ -160,7 +160,7 @@ python3 app.py
 ### Quick Start (5 Minutes)
 
 ```bash
-cd gmail-ai-manager
+cd mail-ai-manager
 python3 app.py  # Start Flask server at http://localhost:5051
 
 # In another terminal:
@@ -283,13 +283,9 @@ curl http://localhost:11434/api/tags  # Check status
 ollama serve &                        # Start if needed
 ```
 
-### Legacy Gmail Manager
+### Folder Name Update
 
-The old `gmail-ai-manager` with OAuth is still available in the repo but deprecated. Use the new Mail AI Manager for:
-- Better compatibility with any email provider
-- Simpler credential management
-- Zero Gmail API complexity
-- Same features, more flexibility
+The folder has been renamed from `gmail-ai-manager` to `mail-ai-manager` to better reflect its universal IMAP provider support. All functionality remains the same.
 
 ---
 
@@ -406,7 +402,7 @@ MYLLM/
 ├── quant_tool.py                 # Quant analysis Open WebUI tool
 ├── searxng/                      # SearXNG config
 ├── quant_api/                    # Quant AI FastAPI backend
-├── gmail-ai-manager/             # Gmail AI email manager
+├── mail-ai-manager/              # Mail AI email manager (IMAP)
 ├── triposr-pipeline/             # Image → 3D mesh pipeline
 │   ├── architecture.svg          # Full stack diagram
 │   └── ...
