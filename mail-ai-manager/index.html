@@ -696,7 +696,7 @@ async function testEmailConnection() {
     const r = await fetch('/api/mail/test-connection', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({mail_imap_host: host, mail_imap_port: port, mail_imap_username: email, mail_imap_password: pass})
+      body: JSON.stringify({imap_host: host, imap_port: port, email_address: email, imap_password: pass})
     });
     const d = await r.json();
     if (d.success) {
