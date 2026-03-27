@@ -302,7 +302,7 @@
         </div>
         <div style="display:flex;justify-content:space-between">
           <button class="btn btn-gray" onclick="nextStep(2)">← Back</button>
-          <button class="btn btn-blue" onclick="saveSetupAndNext()">Save &amp; Connect Gmail →</button>
+          <button class="btn btn-blue" onclick="saveSetupAndNext()">Save &amp; Continue →</button>
         </div>
       </div>
     </div>
@@ -671,9 +671,6 @@ async function testOllama() {
 
 async function saveSetupAndNext() {
   const data = {
-    gmail_address:      document.getElementById('gmail_address').value,
-    gmail_client_id:    document.getElementById('gmail_client_id').value,
-    gmail_client_secret: document.getElementById('gmail_client_secret').value,
     ollama_url:         document.getElementById('ollama_url').value,
     ollama_model:       document.getElementById('ollama_model').value,
     auto_archive_spam:  document.getElementById('auto_archive_spam').checked ? 'true' : 'false',

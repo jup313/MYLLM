@@ -80,12 +80,7 @@ def api_setup():
     """Save all configuration from setup form."""
     data = request.get_json() or {}
 
-    required = ["gmail_client_id", "gmail_client_secret", "gmail_address", "ollama_model"]
-    missing  = [k for k in required if not data.get(k)]
-    if missing:
-        return jsonify({"success": False, "error": f"Missing fields: {', '.join(missing)}"}), 400
-
-    # Save all config fields
+    # Save all config fields (no required fields — macOS Mail.app needs none)
     fields = [
         "gmail_client_id", "gmail_client_secret", "gmail_address",
         "ollama_model", "ollama_url",
