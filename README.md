@@ -22,7 +22,7 @@
 |------|---------|------|
 | 💬 **Open WebUI + SearXNG** | Chat UI with private web search | :3000 / :8080 |
 | 📈 **Quant AI** | Stock & crypto analysis + portfolio tracker | :8000 |
-| 📬 **Gmail AI Manager** | AI email triage, summarize, draft replies + Calendar | :5051 |
+| 📧 **Mail AI Manager** | AI email classifier for any IMAP provider (Gmail, iCloud, Outlook, ProtonMail) — 100% local, no Gmail API | :5051 |
 | 🎨 **Stable Diffusion** | Local text-to-image generation · Apple Silicon MPS | :5050 |
 | 🧊 **TripoSR 3D Pipeline** | Image → 3D mesh (Apple Silicon) | :5050 |
 | 🤖 **Tax AI Social** | AI social media content engine for tax/accounting firms | :5055 |
@@ -130,23 +130,164 @@ python main.py
 
 ---
 
-## 📬 Tool 3 — Gmail AI Manager
+## 📧 Tool 3 — Mail AI Manager ⭐ UPDATED
 
-**Local AI that reads, summarizes, categorizes, and drafts replies to your emails.**
+**🎉 Now works with ANY IMAP email provider (Gmail, iCloud, Outlook, ProtonMail) — no Gmail API restrictions!**
+
+Local AI that classifies, summarizes, categorizes, and drafts replies to your emails.
 
 ```bash
 cd gmail-ai-manager
-bash setup.sh
-bash start.sh
+python3 app.py
 # Open: http://localhost:5051
 ```
 
-Features:
-- ✅ Auto-summarize inbox (no email ever leaves your machine)
-- ✅ Categorize by priority (urgent / action / info / promo)
-- ✅ Draft AI replies with one click
-- ✅ Unsubscribe detection
-- ✅ Requires Gmail OAuth credentials (stays 100% local)
+### What's New in Phase 4 ✨
+
+**Migration from Gmail Manager to universal Mail AI Manager:**
+- ✅ **Works with any IMAP provider** — Gmail, iCloud, Outlook, ProtonMail, etc.
+- ✅ **No OAuth complexity** — Just IMAP credentials (app-specific password)
+- ✅ **100% local** — Zero cloud dependencies, zero API restrictions
+- ✅ **Hybrid IMAP + AppleScript** — Reliable with native macOS Mail.app fallback
+- ✅ **Feature parity** — All Gmail manager features ported to Mail system
+- ✅ **Same AI classification** — Work, spam, personal, urgent categorization
+- ✅ **Approval queue** — All actions require review before execution
+- ✅ **Draft replies** — LLM-powered reply suggestions
+- ✅ **Unsubscribe handling** — RFC 2369 compliant automatic unsubscribe
+
+### Quick Start (5 Minutes)
+
+```bash
+cd gmail-ai-manager
+python3 app.py  # Start Flask server at http://localhost:5051
+
+# In another terminal:
+curl -X POST http://localhost:5051/api/mail/test-connection \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mail_imap_host": "imap.gmail.com",
+    "mail_imap_port": "993",
+    "mail_imap_username": "your-email@gmail.com",
+    "mail_imap_password": "your-app-password",
+    "mail_account_name": "Gmail"
+  }'
+```
+
+### Supported Providers
+
+| Provider | IMAP Host | Port | Notes |
+|----------|-----------|------|-------|
+| **Gmail** | `imap.gmail.com` | 993 | Requires 16-char app-specific password |
+| **iCloud** | `imap.mail.me.com` | 993 | Requires app-specific password |
+| **Outlook** | `outlook.office365.com` | 993 | Use main password or app password if 2FA |
+| **ProtonMail** | `127.0.0.1` | 1143 | Via IMAP Bridge (localhost) |
+| **Custom** | Any IMAP server | Any | Any IMAP-compatible email service |
+
+### API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/status` | GET | Check system status (Ollama, mail connection) |
+| `/api/mail/test-connection` | POST | Test IMAP credentials |
+| `/api/mail/status` | GET | Check Mail connection status |
+| `/api/setup` | POST | Save IMAP config |
+| `/api/pipeline/run` | POST | Start email classification (max 30 emails) |
+| `/api/pipeline/status` | GET | Check pipeline progress |
+| `/api/emails` | GET | List classified emails |
+| `/api/actions` | GET | List pending actions (archive, trash, flag) |
+| `/api/actions/{id}/approve` | POST | Approve action |
+| `/api/actions/{id}/reject` | POST | Reject action |
+
+### Documentation
+
+- **PHASE4_QUICKSTART.md** — 5-minute setup guide with curl examples
+- **PHASE4_TEST_REPORT.md** — Full integration test results + troubleshooting
+- **MAIL_AI_SETUP.md** — Provider-specific setup guides
+- **MAIL_AI_MIGRATION_GUIDE.md** — Phase 3 migration details
+
+### Architecture
+
+```
+Mail AI Manager (Phase 4)
+├── mail_client.py
+│   ├── IMAPMailClient (primary)
+│   ├── AppleScriptMailClient (fallback)
+│   └── HybridMailClient (orchestrator)
+├── mail_action_engine.py
+│   ├── fetch_unread_mail() — Get emails from INBOX
+│   ├── run_pipeline() — Fetch → Classify → Route
+│   ├── execute_action() — Archive, trash, flag, read
+│   └── Approval queue system
+├── app.py (Flask API)
+├── database.py (SQLite)
+└── llm_engine.py (Ollama integration)
+```
+
+### Configuration Example
+
+```json
+{
+  "mail_imap_host": "imap.gmail.com",
+  "mail_imap_port": "993",
+  "mail_imap_username": "your-email@gmail.com",
+  "mail_imap_password": "your-app-password",
+  "mail_account_name": "Gmail",
+  "ollama_model": "mistral",
+  "auto_archive_spam": "true",
+  "require_approval": "true",
+  "auto_threshold": "0.90"
+}
+```
+
+### Performance
+
+- **IMAP connect:** ~500ms
+- **Fetch 30 emails:** ~2-3s
+- **Classify 30 emails:** ~10-30s (depends on LLM model)
+- **Full pipeline (30 emails):** ~15-40s
+
+### 🔐 Security
+
+- ✅ Passwords stored locally in SQLite (no cloud)
+- ✅ Use app-specific passwords (not main account password)
+- ✅ 100% local processing — no data leaves your Mac
+- ✅ Ollama runs locally — no API calls to external services
+
+### Known Limitations
+
+- IMAP-compatible provider required
+- Unsubscribe requires `List-Unsubscribe` header in email
+- AppleScript fallback limited to macOS Mail.app
+- Local Ollama must be running separately
+
+### Troubleshooting
+
+**IMAP connection failed?**
+```bash
+python3 << 'EOF'
+import imaplib
+try:
+    imap = imaplib.IMAP4_SSL('imap.gmail.com', 993)
+    imap.login('user@gmail.com', 'app-password')
+    print("✅ Success!")
+except Exception as e:
+    print(f"❌ Error: {e}")
+EOF
+```
+
+**Ollama not running?**
+```bash
+curl http://localhost:11434/api/tags  # Check status
+ollama serve &                        # Start if needed
+```
+
+### Legacy Gmail Manager
+
+The old `gmail-ai-manager` with OAuth is still available in the repo but deprecated. Use the new Mail AI Manager for:
+- Better compatibility with any email provider
+- Simpler credential management
+- Zero Gmail API complexity
+- Same features, more flexibility
 
 ---
 
