@@ -46,16 +46,30 @@ def index():
 def api_status():
     """Check overall system status."""
     from llm_engine import check_ollama
-    try:
-        from imap_client import is_authenticated
-    except ImportError:
-        from gmail_client import is_authenticated
+    
+    # Check auth based on configured mail mode
+    mail_mode = get_config("mail_mode") or "macos_mail"
+    if mail_mode == "macos_mail":
+        try:
+            from macos_mail import is_authenticated
+        except ImportError:
+            is_authenticated = lambda: False
+    else:
+        try:
+            from imap_client import is_authenticated
+        except ImportError:
+            try:
+                from gmail_client import is_authenticated
+            except ImportError:
+                is_authenticated = lambda: False
+    
     ollama = check_ollama()
     return jsonify({
         "configured":     is_configured(),
         "authenticated":  is_authenticated(),
         "ollama_running": ollama["running"],
         "ollama_models":  ollama.get("models", []),
+        "mail_mode":      mail_mode,
         "config":         {k: v for k, v in get_all_config().items()
                            if k not in ("gmail_client_secret", "mail_imap_password")},
     })
@@ -107,35 +121,43 @@ def api_setup():
 
 @app.route("/api/mail/test-connection", methods=["POST"])
 def api_mail_test_connection():
-    """Test IMAP connection with provided credentials."""
+    """Test email connection — supports macOS Mail.app or IMAP."""
     data = request.get_json() or {}
+    mode = data.get("mode", "macos_mail")
     
-    required = ["imap_host", "imap_port", "email_address", "imap_password"]
-    missing = [k for k in required if not data.get(k)]
-    if missing:
-        return jsonify({"success": False, "error": f"Missing fields: {', '.join(missing)}"}), 400
-    
-    try:
-        import imaplib
-        host = data.get("imap_host")
-        port = int(data.get("imap_port", 993))
-        email = data.get("email_address")
-        password = data.get("imap_password")
-        
-        # Attempt IMAP connection
-        mail = imaplib.IMAP4_SSL(host, port)
-        mail.login(email, password)
-        mail.logout()
-        
-        return jsonify({
-            "success": True,
-            "message": f"Successfully connected to {host}:{port}",
-            "provider": data.get("provider", "Unknown")
-        })
-    except imaplib.IMAP4.error as e:
-        return jsonify({"success": False, "error": f"IMAP error: {str(e)}"}), 400
-    except Exception as e:
-        return jsonify({"success": False, "error": f"Connection failed: {str(e)}"}), 400
+    if mode == "macos_mail":
+        # Use macOS Mail.app via AppleScript — no credentials needed
+        try:
+            from macos_mail import test_mail_connection
+            result = test_mail_connection()
+            if result.get("success"):
+                set_config("mail_mode", "macos_mail")
+            return jsonify(result)
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Mail.app error: {str(e)}"}), 400
+    else:
+        # IMAP mode
+        required = ["imap_host", "imap_port", "email_address", "imap_password"]
+        missing = [k for k in required if not data.get(k)]
+        if missing:
+            return jsonify({"success": False, "error": f"Missing fields: {', '.join(missing)}"}), 400
+        try:
+            import imaplib
+            host = data.get("imap_host")
+            port = int(data.get("imap_port", 993))
+            email_addr = data.get("email_address")
+            password = data.get("imap_password")
+            mail = imaplib.IMAP4_SSL(host, port)
+            mail.login(email_addr, password)
+            mail.logout()
+            set_config("mail_mode", "imap")
+            set_config("mail_imap_host", host)
+            set_config("mail_imap_port", str(port))
+            set_config("mail_imap_username", email_addr)
+            set_config("mail_imap_password", password)
+            return jsonify({"success": True, "message": f"Connected to {host}:{port}"})
+        except Exception as e:
+            return jsonify({"success": False, "error": f"IMAP error: {str(e)}"}), 400
 
 
 # ── Gmail OAuth ───────────────────────────────────────────────────────
