@@ -46,7 +46,10 @@ def index():
 def api_status():
     """Check overall system status."""
     from llm_engine import check_ollama
-    from gmail_client import is_authenticated
+    try:
+        from imap_client import is_authenticated
+    except ImportError:
+        from gmail_client import is_authenticated
     ollama = check_ollama()
     return jsonify({
         "configured":     is_configured(),
@@ -54,7 +57,7 @@ def api_status():
         "ollama_running": ollama["running"],
         "ollama_models":  ollama.get("models", []),
         "config":         {k: v for k, v in get_all_config().items()
-                           if k not in ("gmail_client_secret",)},
+                           if k not in ("gmail_client_secret", "mail_imap_password")},
     })
 
 
