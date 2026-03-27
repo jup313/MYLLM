@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-app.py — Flask web server for Gmail AI Manager
-All API routes + OAuth2 callback
+app.py — Flask web server for Mail AI Manager
+Universal IMAP email manager with Ollama LLM integration
 """
 
 import os
@@ -100,6 +100,39 @@ def api_setup():
             set_config(k, v)
 
     return jsonify({"success": True, "message": "Configuration saved"})
+
+
+@app.route("/api/mail/test-connection", methods=["POST"])
+def api_mail_test_connection():
+    """Test IMAP connection with provided credentials."""
+    data = request.get_json() or {}
+    
+    required = ["imap_host", "imap_port", "email_address", "imap_password"]
+    missing = [k for k in required if not data.get(k)]
+    if missing:
+        return jsonify({"success": False, "error": f"Missing fields: {', '.join(missing)}"}), 400
+    
+    try:
+        import imaplib
+        host = data.get("imap_host")
+        port = int(data.get("imap_port", 993))
+        email = data.get("email_address")
+        password = data.get("imap_password")
+        
+        # Attempt IMAP connection
+        mail = imaplib.IMAP4_SSL(host, port)
+        mail.login(email, password)
+        mail.logout()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Successfully connected to {host}:{port}",
+            "provider": data.get("provider", "Unknown")
+        })
+    except imaplib.IMAP4.error as e:
+        return jsonify({"success": False, "error": f"IMAP error: {str(e)}"}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Connection failed: {str(e)}"}), 400
 
 
 # ── Gmail OAuth ───────────────────────────────────────────────────────
@@ -419,7 +452,8 @@ def api_llm_classify():
 if __name__ == "__main__":
     print("""
 ╔══════════════════════════════════════════════════╗
-║   📬 Gmail AI Manager                          ║
+║   📧 Mail AI Manager                           ║
+║   Universal IMAP Email Manager                 ║
 ║   Open: http://localhost:5051                  ║
 ╚══════════════════════════════════════════════════╝
 """)
