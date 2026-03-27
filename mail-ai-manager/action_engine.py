@@ -11,10 +11,47 @@ from database import (
     add_action, complete_action, log_action,
     get_emails
 )
-from gmail_client import (
-    fetch_unread, archive_email, trash_email,
-    apply_label, create_draft, mark_read
-)
+# Dynamic mail client import based on configured mode
+def _get_mail_client():
+    """Return the appropriate mail client module based on config."""
+    from database import get_config as _gc
+    mode = _gc("mail_mode") or "macos_mail"
+    if mode == "macos_mail":
+        import macos_mail
+        return macos_mail
+    else:
+        try:
+            import imap_client
+            return imap_client
+        except ImportError:
+            import gmail_client
+            return gmail_client
+
+def fetch_unread(max_results=50):
+    return _get_mail_client().fetch_unread(max_results=max_results)
+
+def archive_email(email_id):
+    return _get_mail_client().archive_email(email_id)
+
+def trash_email(email_id):
+    return _get_mail_client().trash_email(email_id)
+
+def mark_read(email_id):
+    return _get_mail_client().mark_read(email_id)
+
+def apply_label(email_id, label="AI-Reviewed"):
+    """Apply label — only supported by Gmail client, otherwise mark read."""
+    client = _get_mail_client()
+    if hasattr(client, 'apply_label'):
+        return client.apply_label(email_id, label)
+    return mark_read(email_id)  # fallback
+
+def create_draft(to, subject, body, thread_id=None):
+    """Create draft — only supported by Gmail client."""
+    client = _get_mail_client()
+    if hasattr(client, 'create_draft'):
+        return client.create_draft(to, subject, body, thread_id)
+    return {"success": False, "error": "Drafts not supported in current mail mode"}
 from llm_engine import classify_email, draft_reply
 from unsubscribe import safe_unsubscribe
 
@@ -206,7 +243,6 @@ def execute_action(action_id: int, action_type: str, email_id: str,
 
         elif action_type == "draft_reply":
             from database import get_email
-            from gmail_client import create_draft
             email = get_email(email_id)
             if email:
                 body    = custom_body or email.get("draft_reply", "")
@@ -219,13 +255,16 @@ def execute_action(action_id: int, action_type: str, email_id: str,
 
         elif action_type == "send_reply":
             from database import get_email
-            from gmail_client import send_email
             email = get_email(email_id)
             if email and custom_body:
                 subject = f"Re: {email.get('subject', '')}"
                 to      = email.get("sender_email", "")
-                result  = send_email(to, subject, custom_body, email.get("thread_id"))
-                ok      = result.get("success", False)
+                client = _get_mail_client()
+                if hasattr(client, 'send_email'):
+                    result = client.send_email(to, subject, custom_body, email.get("thread_id"))
+                    ok = result.get("success", False)
+                else:
+                    ok = False
             else:
                 ok = False
 
