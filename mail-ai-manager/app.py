@@ -607,7 +607,14 @@ def api_pipeline_run():
 
 @app.route("/api/pipeline/status")
 def api_pipeline_status():
-    return jsonify(_pipeline_status)
+    # Merge basic running/stats/error with granular progress from action_engine
+    result = dict(_pipeline_status)
+    try:
+        from action_engine import pipeline_progress
+        result["progress"] = dict(pipeline_progress)
+    except Exception:
+        result["progress"] = None
+    return jsonify(result)
 
 
 # ── Emails ───────────────────────────────────────────────────────────

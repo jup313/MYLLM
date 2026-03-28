@@ -377,7 +377,17 @@
     </div>
 
     <div id="pipeline-status-bar" class="alert alert-info" style="display:none">
-      <span class="spin">⏳</span> Pipeline running — fetching and classifying emails...
+      <div id="pipeline-status-text"><span class="spin">⏳</span> Pipeline running — fetching and classifying emails...</div>
+      <div id="pipeline-progress-bar" style="margin-top:10px;display:none">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-bottom:4px">
+          <span id="pipeline-phase-label">Fetching...</span>
+          <span id="pipeline-pct-label">0%</span>
+        </div>
+        <div style="height:8px;background:var(--bg);border-radius:4px;overflow:hidden">
+          <div id="pipeline-bar-fill" style="height:100%;width:0%;background:var(--green);border-radius:4px;transition:width .3s"></div>
+        </div>
+        <div id="pipeline-detail-text" style="font-size:11px;color:var(--dim);margin-top:4px"></div>
+      </div>
     </div>
     <div id="pipeline-result" style="display:none" class="alert alert-success"></div>
 
@@ -1043,33 +1053,94 @@ async function runPipeline() {
   const btn = document.getElementById('pipeline-btn');
   const bar = document.getElementById('pipeline-status-bar');
   const res = document.getElementById('pipeline-result');
+  const progressBar = document.getElementById('pipeline-progress-bar');
+  const barFill = document.getElementById('pipeline-bar-fill');
+  const phaseLabel = document.getElementById('pipeline-phase-label');
+  const pctLabel = document.getElementById('pipeline-pct-label');
+  const detailText = document.getElementById('pipeline-detail-text');
+  const statusText = document.getElementById('pipeline-status-text');
   btn.disabled = true;
   bar.style.display = 'block';
+  progressBar.style.display = 'block';
   res.style.display = 'none';
+  barFill.style.width = '0%';
+  phaseLabel.textContent = 'Starting...';
+  pctLabel.textContent = '0%';
+  detailText.textContent = '';
+  statusText.innerHTML = '<span class="spin">⏳</span> Pipeline running — fetching all emails...';
   try {
     const r = await fetch('/api/pipeline/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({max_emails:0})});
     const d = await r.json();
-    if (!d.success) { bar.style.display='none'; btn.disabled=false; alert(d.error); return; }
-    // Poll
+    if (!d.success) { bar.style.display='none'; progressBar.style.display='none'; btn.disabled=false; showToast('❌ ' + d.error, true); return; }
+    // Poll with progress
     const poll = setInterval(async () => {
-      const pr = await fetch('/api/pipeline/status');
-      const pd = await pr.json();
-      if (!pd.running) {
-        clearInterval(poll);
-        bar.style.display = 'none';
-        btn.disabled = false;
-        if (pd.error) {
-          res.className='alert alert-error'; res.style.display='block';
-          res.textContent = '❌ Pipeline error: ' + pd.error;
-        } else {
-          const s = pd.stats || {};
-          res.className='alert alert-success'; res.style.display='block';
-          res.innerHTML = `✅ Pipeline complete! Fetched: <b>${s.fetched||0}</b> · Classified: <b>${s.classified||0}</b> · Auto-trashed: <b>${s.auto_trashed||0}</b> · Queued: <b>${s.queued_for_approval||0}</b>`;
+      try {
+        const pr = await fetch('/api/pipeline/status');
+        const pd = await pr.json();
+        const p = pd.progress || {};
+        // Update progress bar based on phase
+        if (p.phase === 'fetching') {
+          const total = p.fetch_total || 0;
+          const checked = p.fetch_checked || 0;
+          const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
+          phaseLabel.textContent = '📥 Fetching emails...';
+          pctLabel.textContent = pct + '%';
+          barFill.style.width = pct + '%';
+          barFill.style.background = 'var(--blue)';
+          detailText.textContent = `Checked ${checked} / ${total} messages`;
+          statusText.innerHTML = `<span class="spin">⏳</span> Fetching emails from server... ${checked}/${total}`;
+        } else if (p.phase === 'saving') {
+          phaseLabel.textContent = '💾 Saving to database...';
+          pctLabel.textContent = '';
+          barFill.style.width = '100%';
+          barFill.style.background = 'var(--teal)';
+          const newCount = p.new_emails || 0;
+          const skipped = p.skipped_existing || 0;
+          detailText.textContent = `New: ${newCount} · Already existed: ${skipped}`;
+          statusText.innerHTML = '<span class="spin">⏳</span> Saving new emails to database...';
+        } else if (p.phase === 'classifying') {
+          const done = p.classify_done || 0;
+          const total = p.classify_total || 0;
+          const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+          phaseLabel.textContent = '🧠 Classifying with AI...';
+          pctLabel.textContent = pct + '%';
+          barFill.style.width = pct + '%';
+          barFill.style.background = 'var(--purple)';
+          detailText.textContent = `Classified ${done} / ${total} emails`;
+          statusText.innerHTML = `<span class="spin">🧠</span> AI classifying emails... ${done}/${total}`;
+        } else if (p.phase === 'routing') {
+          phaseLabel.textContent = '🔀 Routing actions...';
+          pctLabel.textContent = '';
+          barFill.style.width = '90%';
+          barFill.style.background = 'var(--yellow)';
+          detailText.textContent = p.message || 'Applying auto-actions and queuing for approval...';
+          statusText.innerHTML = '<span class="spin">⏳</span> Routing actions...';
+        } else if (p.phase === 'done') {
+          barFill.style.width = '100%';
+          barFill.style.background = 'var(--green)';
+          phaseLabel.textContent = '✅ Done!';
+          pctLabel.textContent = '100%';
+        } else if (p.message) {
+          detailText.textContent = p.message;
         }
-        loadInbox(); loadInboxStats(); checkStatus();
-      }
-    }, 2000);
-  } catch(e) { bar.style.display='none'; btn.disabled=false; alert(e); }
+        if (!pd.running) {
+          clearInterval(poll);
+          bar.style.display = 'none';
+          progressBar.style.display = 'none';
+          btn.disabled = false;
+          if (pd.error) {
+            res.className='alert alert-error'; res.style.display='block';
+            res.textContent = '❌ Pipeline error: ' + pd.error;
+          } else {
+            const s = pd.stats || {};
+            res.className='alert alert-success'; res.style.display='block';
+            res.innerHTML = `✅ Pipeline complete! Fetched: <b>${s.fetched||0}</b> · New: <b>${s.new_emails||0}</b> · Skipped: <b>${s.skipped_existing||0}</b> · Classified: <b>${s.classified||0}</b> · Auto-trashed: <b>${s.auto_trashed||0}</b> · Queued: <b>${s.queued_for_approval||0}</b>`;
+          }
+          loadInbox(); loadInboxStats(); checkStatus();
+        }
+      } catch(pollErr) { /* ignore poll errors */ }
+    }, 1500);
+  } catch(e) { bar.style.display='none'; progressBar.style.display='none'; btn.disabled=false; showToast('❌ ' + e.message, true); }
 }
 
 // ─── Email Modal ────────────────────────────────────────────────────
