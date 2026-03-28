@@ -82,6 +82,7 @@ def init_db():
             llm_action      TEXT,
             draft_reply     TEXT,
             unsubscribe_url TEXT,
+            starred         INTEGER DEFAULT 0,
             processed       INTEGER DEFAULT 0,
             fetched_at      TEXT DEFAULT (datetime('now'))
         )
@@ -183,6 +184,7 @@ def init_db():
     _add_column_if_missing(c, "emails", "account_id", "INTEGER")
     _add_column_if_missing(c, "emails", "user_corrected", "INTEGER DEFAULT 0")
     _add_column_if_missing(c, "emails", "body_html", "TEXT")
+    _add_column_if_missing(c, "emails", "starred", "INTEGER DEFAULT 0")
 
     conn.commit()
     conn.close()
@@ -254,15 +256,16 @@ def save_email(email: dict):
         INSERT OR REPLACE INTO emails
         (id, thread_id, subject, sender, sender_email, snippet, body, date,
          labels, category, confidence, llm_action, draft_reply, unsubscribe_url,
-         processed, importance, importance_reason, account_id, user_corrected, body_html)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         starred, processed, importance, importance_reason, account_id, user_corrected, body_html)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
         email.get("id"), email.get("thread_id"), email.get("subject"),
         email.get("sender"), email.get("sender_email"), email.get("snippet"),
         email.get("body"), email.get("date"), email.get("labels"),
         email.get("category"), email.get("confidence"),
         email.get("llm_action"), email.get("draft_reply"),
-        email.get("unsubscribe_url"), email.get("processed", 0),
+        email.get("unsubscribe_url"), email.get("starred", 0),
+        email.get("processed", 0),
         email.get("importance"), email.get("importance_reason"),
         email.get("account_id"), email.get("user_corrected", 0),
         email.get("body_html")

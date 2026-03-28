@@ -150,7 +150,8 @@
     <div class="nav-item active" onclick="showPage('welcome')" id="nav-welcome">🏠 Home</div>
     <div class="nav-item" onclick="showPage('setup')" id="nav-setup">⚙️ Setup</div>
     <div class="nav-item" onclick="showPage('inbox')" id="nav-inbox">📥 Inbox</div>
-    <div class="nav-item" onclick="showPage('queue')" id="nav-queue">⏳ Approval Queue <span class="badge" id="queue-badge" style="display:none">0</span></div>
+    <div class="nav-item" onclick="showPage('clean')" id="nav-clean">🧹 Clean Inbox</div>
+    <div class="nav-item" onclick="showPage('queue')" id="nav-queue">🤖 AI Actions <span class="badge" id="queue-badge" style="display:none">0</span></div>
     <div class="nav-item" onclick="showPage('summaries')" id="nav-summaries">📊 Summaries</div>
     <div class="nav-item" onclick="showPage('logs')" id="nav-logs">📋 Logs</div>
     <div class="nav-item" onclick="showPage('accounts')" id="nav-accounts">📬 Accounts</div>
@@ -397,20 +398,83 @@
     </div>
   </div>
 
-  <!-- ══ APPROVAL QUEUE ══ -->
-  <div id="page-queue" class="page" style="display:none">
+  <!-- ══ CLEAN INBOX PAGE ══ -->
+  <div id="page-clean" class="page" style="display:none">
     <div class="page-header">
-      <div><div class="page-title">⏳ Approval Queue</div><div class="page-subtitle">Review and approve/reject AI-suggested actions</div></div>
+      <div><div class="page-title">🧹 Clean Inbox</div><div class="page-subtitle">One-click cleanup — AI recommends what to trash, archive, or keep</div></div>
       <div style="display:flex;gap:10px">
-        <button class="btn btn-gray btn-sm" onclick="loadQueue()">🔄 Refresh</button>
-        <button class="btn btn-red btn-sm" onclick="bulkReject()">✗ Reject All</button>
-        <button class="btn btn-green btn-sm" onclick="bulkApprove()">✓ Approve All Safe</button>
+        <button class="btn btn-gray btn-sm" onclick="loadCleanPage()">🔄 Refresh</button>
       </div>
     </div>
-    <div id="queue-empty" class="empty-state" style="display:none">
-      <div class="icon">✅</div><div>Queue is empty — nothing pending</div>
+
+    <!-- Big Clean Button -->
+    <div class="card" style="text-align:center;padding:32px;border:2px solid rgba(74,222,128,.2);background:linear-gradient(135deg,rgba(74,222,128,.03),rgba(96,165,250,.03))">
+      <div style="font-size:48px;margin-bottom:12px">🧹</div>
+      <div style="font-size:22px;font-weight:700;color:var(--text);margin-bottom:6px">Clean All Junk</div>
+      <div style="font-size:14px;color:var(--muted);margin-bottom:18px">Trash spam · Archive marketing &amp; old notifications — one click</div>
+      <div id="clean-total-summary" style="font-size:16px;color:var(--yellow);margin-bottom:16px;font-weight:600"></div>
+      <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-green" style="font-size:16px;padding:14px 40px" onclick="cleanAllJunk()" id="clean-all-btn">🧹 Clean All Junk Now</button>
+        <button class="btn btn-blue" style="font-size:16px;padding:14px 40px;background:linear-gradient(135deg,#1d4ed8,#7c3aed);border:none" onclick="autoClean()" id="auto-clean-btn">🤖 AI Auto-Clean Everything</button>
+      </div>
+      <div id="clean-all-result" style="margin-top:14px"></div>
     </div>
-    <div id="queue-list"></div>
+
+    <!-- Category Breakdown -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">📊 Categories Breakdown</div>
+      <div id="clean-categories-list">
+        <div class="empty-state"><div class="icon spin">⏳</div><div>Loading...</div></div>
+      </div>
+    </div>
+
+    <!-- Unsubscribe Manager -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">🚫 Unsubscribe Manager</div>
+      <div style="font-size:12px;color:var(--dim);margin-bottom:12px">Senders with unsubscribe links — stop junk at the source</div>
+      <div id="unsub-list">
+        <div class="empty-state"><div class="icon">🔍</div><div>Loading unsubscribe candidates...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ AI ACTIONS HUB ══ -->
+  <div id="page-queue" class="page" style="display:none">
+    <div class="page-header">
+      <div><div class="page-title">🤖 AI Actions Hub</div><div class="page-subtitle">AI recommendations, pending actions, and learning stats</div></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-gray btn-sm" onclick="loadAIHub()">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <!-- AI Stats -->
+    <div class="stats-grid" id="ai-hub-stats"></div>
+
+    <!-- Smart Recommendations -->
+    <div class="card">
+      <div class="card-title">⚡ Quick Actions</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-green" onclick="bulkApprove()">✅ Execute All Safe Actions</button>
+        <button class="btn btn-red btn-sm" onclick="bulkReject()">✗ Dismiss All</button>
+      </div>
+    </div>
+
+    <!-- Pending Actions by Type -->
+    <div class="card">
+      <div class="card-title">⏳ Pending Actions <span class="badge" id="hub-queue-count" style="margin-left:8px;display:none">0</span></div>
+      <div id="queue-empty" class="empty-state" style="display:none">
+        <div class="icon">✅</div><div>No pending actions — inbox is clean!</div>
+      </div>
+      <div id="queue-list"></div>
+    </div>
+
+    <!-- Recent AI Activity -->
+    <div class="card">
+      <div class="card-title">📋 Recent AI Activity</div>
+      <div id="ai-recent-activity">
+        <div class="empty-state"><div class="icon">📋</div><div>No recent activity</div></div>
+      </div>
+    </div>
   </div>
 
   <!-- ══ SUMMARIES ══ -->
@@ -911,7 +975,7 @@ async function checkAuthStatus() {
 }
 
 async function disconnectEmail() {
-  if (!confirm('Disconnect email account?')) return;
+
   document.getElementById('gmail_address').value = '';
   document.getElementById('imap_password').value = '';
   document.getElementById('auth-not-connected').style.display = 'block';
@@ -1071,7 +1135,7 @@ async function generateDraftForEmail(id) {
 async function sendDraftFromModal() {
   if (!currentEmailId) return;
   const body = document.getElementById('modal-draft-text').value;
-  if (!confirm('Send this reply?')) return;
+
   const r = await fetch(`/api/actions`, {method:'GET'});
   const actions = (await r.json()).actions || [];
   const action = actions.find(a => a.email_id === currentEmailId);
@@ -1107,7 +1171,7 @@ async function archiveEmail(id) {
 }
 
 async function trashEmail(id) {
-  if (!confirm('Move to trash?')) return;
+
   alert('⏳ Trash action queued. Check Approval Queue.');
   closeModal();
 }
@@ -1178,7 +1242,7 @@ async function rejectAction(id) {
 }
 
 async function bulkApprove() {
-  if (!confirm('Approve all archive/trash/label actions (not send/unsubscribe)?')) return;
+
   const r = await fetch('/api/actions');
   const d = await r.json();
   const safeTypes = ['archive','label','flag'];
@@ -1192,7 +1256,7 @@ async function bulkApprove() {
 }
 
 async function bulkReject() {
-  if (!confirm('Reject (skip) all pending actions?')) return;
+
   const r = await fetch('/api/actions');
   const d = await r.json();
   for (const a of d.actions||[]) {
@@ -1733,7 +1797,7 @@ async function testAccount(id, btn) {
 }
 
 async function deleteAccount(id) {
-  if (!confirm('Delete this account?')) return;
+
   await fetch(`/api/accounts/${id}`, {method:'DELETE'});
   showToast('Account deleted'); loadAccounts();
 }
@@ -2125,10 +2189,6 @@ async function executeBulkDelete() {
     return;
   }
 
-  if (!confirm(`Are you sure you want to delete ALL ${categories.join(' + ')} emails? This cannot be undone.`)) {
-    return;
-  }
-
   btn.disabled = true;
   btn.innerHTML = '<span class="spin">🗑️</span> Deleting...';
   resEl.innerHTML = '<span class="text-muted">⏳ Deleting emails...</span>';
@@ -2160,6 +2220,193 @@ async function executeBulkDelete() {
     btn.textContent = '🗑️ Delete Selected';
   }
 }
+
+// ─── Clean Inbox Page ──────────────────────────────────────────────
+
+async function loadCleanPage() {
+  // Load category counts
+  try {
+    const r = await fetch('/api/emails/category-counts');
+    const d = await r.json();
+    const el = document.getElementById('clean-categories-list');
+    const summaryEl = document.getElementById('clean-total-summary');
+    
+    summaryEl.textContent = `${d.total_cleanable} emails ready to clean`;
+    
+    if (!d.categories || d.categories.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div>No classified emails — run AI Sort first</div></div>';
+      return;
+    }
+    
+    el.innerHTML = d.categories.map(c => {
+      const bar = Math.min(100, Math.round((c.count / (d.categories[0].count || 1)) * 100));
+      const actionBtn = c.auto_safe
+        ? `<button class="btn ${c.recommended_action==='trash'?'btn-red':'btn-blue'} btn-sm" onclick="cleanCategory('${c.category}','${c.recommended_action}')">${c.icon} ${c.label} (${c.count})</button>`
+        : `<span style="font-size:12px;color:var(--green)">✅ ${c.label}</span>`;
+      return `<div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:24px;width:36px;text-align:center">${c.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="font-weight:600;color:var(--text);text-transform:capitalize">${c.category}</span>
+            <span style="font-size:13px;color:var(--muted)">${c.count} emails · ${Math.round(c.avg_confidence*100)}% avg confidence</span>
+          </div>
+          <div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:${bar}%;background:${c.auto_safe?'var(--yellow)':'var(--green)'};border-radius:3px"></div>
+          </div>
+        </div>
+        <div style="flex-shrink:0">${actionBtn}</div>
+      </div>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+
+  // Load unsubscribe candidates
+  try {
+    const r = await fetch('/api/emails/unsubscribe-candidates');
+    const d = await r.json();
+    const el = document.getElementById('unsub-list');
+    if (!d.candidates || d.candidates.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">✅</div><div>No unsubscribe candidates found</div></div>';
+      return;
+    }
+    el.innerHTML = d.candidates.slice(0, 20).map(c => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;color:var(--text)">${esc(c.sender||c.sender_email)}</div>
+          <div style="font-size:12px;color:var(--muted)">${c.email_count} emails · ${esc(c.category||'')} · Last: ${(c.last_date||'').substring(0,10)}</div>
+        </div>
+        <button class="btn btn-red btn-sm" onclick="unsubSender('${esc(c.sender_email)}',this)">🚫 Unsubscribe</button>
+      </div>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function cleanCategory(category, action) {
+  showToast(`⏳ ${action === 'trash' ? 'Trashing' : 'Archiving'} ${category}...`);
+  try {
+    const r = await fetch('/api/emails/bulk-action', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({categories:[category], action})
+    });
+    const d = await r.json();
+    if (d.success) { showToast(`✅ ${d.message}`); loadCleanPage(); loadInboxStats(); }
+    else showToast('❌ ' + (d.error||'Failed'), true);
+  } catch(e) { showToast('❌ ' + e.message, true); }
+}
+
+async function cleanAllJunk() {
+  const btn = document.getElementById('clean-all-btn');
+  const resEl = document.getElementById('clean-all-result');
+  btn.disabled = true; btn.innerHTML = '<span class="spin">🧹</span> Cleaning...';
+  resEl.innerHTML = '';
+  let totalActioned = 0;
+  try {
+    // Trash spam
+    const r1 = await fetch('/api/emails/bulk-action', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({categories:['spam'],action:'trash'})});
+    const d1 = await r1.json(); totalActioned += d1.actioned||0;
+    // Archive marketing + notifications
+    const r2 = await fetch('/api/emails/bulk-action', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({categories:['marketing','notification'],action:'archive'})});
+    const d2 = await r2.json(); totalActioned += d2.actioned||0;
+    resEl.innerHTML = `<div class="alert alert-success">✅ Cleaned ${totalActioned} emails! Spam trashed, marketing & notifications archived.</div>`;
+    showToast(`✅ Cleaned ${totalActioned} emails!`);
+    btn.disabled = false; btn.textContent = '🧹 Clean All Junk Now';
+    loadCleanPage(); loadInboxStats();
+  } catch(e) {
+    resEl.innerHTML = `<div class="alert alert-error">❌ ${e.message}</div>`;
+    btn.disabled = false; btn.textContent = '🧹 Clean All Junk Now';
+  }
+}
+
+async function autoClean() {
+  const btn = document.getElementById('auto-clean-btn');
+  const resEl = document.getElementById('clean-all-result');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">🤖</span> AI Cleaning...';
+  resEl.innerHTML = '<div class="alert alert-info"><span class="spin">🤖</span> AI is processing all emails — trashing spam, archiving junk, unsubscribing, keeping important...</div>';
+  try {
+    const r = await fetch('/api/emails/auto-clean', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'}
+    });
+    const d = await r.json();
+    if (d.success) {
+      const s = d.stats || {};
+      resEl.innerHTML = `<div class="alert alert-success" style="font-size:14px;line-height:1.8">
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px">🤖 AI Auto-Clean Complete!</div>
+        <div>📧 <b>${d.total_processed}</b> emails processed</div>
+        <div>🗑️ <b>${s.trashed||0}</b> trashed (spam)</div>
+        <div>📦 <b>${s.archived||0}</b> archived (marketing/notifications)</div>
+        <div>🚫 <b>${s.unsubscribed||0}</b> unsubscribed</div>
+        <div>✅ <b>${s.kept||0}</b> kept (personal/work/urgent)</div>
+        ${s.errors > 0 ? `<div>⚠️ <b>${s.errors}</b> errors</div>` : ''}
+      </div>`;
+      showToast(`🤖 AI cleaned ${d.total_processed} emails!`);
+      loadCleanPage();
+      loadInboxStats();
+      checkStatus();
+    } else {
+      resEl.innerHTML = `<div class="alert alert-error">❌ ${d.error || 'Auto-clean failed'}</div>`;
+    }
+  } catch(e) {
+    resEl.innerHTML = `<div class="alert alert-error">❌ ${e.message}</div>`;
+  }
+  btn.disabled = false;
+  btn.innerHTML = '🤖 AI Auto-Clean Everything';
+}
+
+async function unsubSender(email, btn) {
+  btn.disabled = true; btn.textContent = '⏳...';
+  try {
+    const r = await fetch('/api/emails/bulk-unsubscribe', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({senders:[email]})});
+    const d = await r.json();
+    if (d.unsubscribed > 0) { btn.textContent = '✅ Done'; btn.className = 'btn btn-green btn-sm'; showToast(`✅ Unsubscribed from ${email}`); }
+    else { btn.disabled = false; btn.textContent = '❌ Failed'; showToast('❌ Unsubscribe failed', true); }
+  } catch(e) { btn.disabled = false; btn.textContent = '🚫 Unsubscribe'; showToast('❌ ' + e.message, true); }
+}
+
+// ─── AI Actions Hub ────────────────────────────────────────────────
+
+async function loadAIHub() {
+  // Load stats
+  try {
+    const [statsR, fbR, actR] = await Promise.all([fetch('/api/stats'), fetch('/api/feedback/stats'), fetch('/api/actions')]);
+    const stats = await statsR.json();
+    const fb = await fbR.json();
+    const acts = await actR.json();
+    document.getElementById('ai-hub-stats').innerHTML = `
+      <div class="stat-card"><div class="stat-number text-green">${stats.total_emails||0}</div><div class="stat-label">📧 Total Classified</div></div>
+      <div class="stat-card"><div class="stat-number" style="color:var(--yellow)">${acts.count||0}</div><div class="stat-label">⏳ Pending Actions</div></div>
+      <div class="stat-card"><div class="stat-number" style="color:var(--blue)">${fb.accuracy_pct||0}%</div><div class="stat-label">🎯 AI Accuracy</div></div>
+      <div class="stat-card"><div class="stat-number" style="color:var(--purple)">${fb.total_corrections||0}</div><div class="stat-label">✏️ Corrections</div></div>`;
+    const hubCount = document.getElementById('hub-queue-count');
+    if (acts.count > 0) { hubCount.textContent = acts.count; hubCount.style.display = ''; }
+    else hubCount.style.display = 'none';
+  } catch(e) {}
+  // Load queue
+  loadQueue();
+  // Load recent activity
+  try {
+    const r = await fetch('/api/logs?limit=10');
+    const d = await r.json();
+    const el = document.getElementById('ai-recent-activity');
+    if (!d.logs || d.logs.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>No recent activity yet</div></div>';
+      return;
+    }
+    el.innerHTML = d.logs.map(l => `<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+      <span style="color:var(--dim);white-space:nowrap">${(l.timestamp||'').substring(11,16)}</span>
+      <span style="color:${l.result==='success'?'var(--green)':'var(--red)'}">${l.result==='success'?'✅':'❌'}</span>
+      <span style="color:var(--muted)">${l.action||'?'}</span>
+      <span style="color:var(--dim);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.details||'')}</span>
+    </div>`).join('');
+  } catch(e) {}
+}
+
+// Patch showPage for clean + queue
+const _prevShowPage = window.showPage;
+window.showPage = function(name) {
+  _prevShowPage(name);
+  if (name === 'clean') loadCleanPage();
+  if (name === 'queue') loadAIHub();
+};
 
 // ─── Startup: check welcome preference ─────────────────────────────
 (function() {

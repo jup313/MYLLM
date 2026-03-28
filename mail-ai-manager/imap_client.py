@@ -108,7 +108,7 @@ def test_mail_connection() -> dict:
         return {"success": False, "error": str(e)}
 
 
-def _parse_email_message(msg_data, msg_id_str):
+def _parse_email_message(msg_data, msg_id_str, flags_str=""):
     """Parse a raw email message into our standard dict format."""
     raw_email = msg_data[0][1]
     msg = email.message_from_bytes(raw_email)
@@ -219,9 +219,20 @@ def fetch_all(max_results: int = 0) -> list:
         emails = []
         for msg_id in recent_ids:
             try:
-                status, msg_data = imap.fetch(msg_id, "(RFC822)")
+                # Fetch both the message and its flags (to detect starred/flagged)
+                status, msg_data = imap.fetch(msg_id, "(FLAGS RFC822)")
                 if status == "OK" and msg_data[0]:
-                    parsed = _parse_email_message(msg_data, msg_id.decode())
+                    # Extract flags from response
+                    flags_str = ""
+                    if isinstance(msg_data[0], tuple) and len(msg_data[0]) >= 1:
+                        flag_part = msg_data[0][0] if isinstance(msg_data[0][0], bytes) else b""
+                        flags_str = flag_part.decode("utf-8", errors="replace")
+                    parsed = _parse_email_message(msg_data, msg_id.decode(), flags_str)
+                    # Check if email is starred/flagged — protect from cleaning
+                    if b"\\Flagged" in (msg_data[0][0] if isinstance(msg_data[0][0], bytes) else b""):
+                        parsed["starred"] = 1
+                    else:
+                        parsed["starred"] = 0
                     emails.append(parsed)
             except Exception as e:
                 print(f"  ⚠️  Error parsing message {msg_id}: {e}")

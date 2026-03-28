@@ -296,7 +296,7 @@ def api_bulk_delete():
     conn = db.get_conn()
     placeholders = ",".join("?" * len(categories))
     rows = conn.execute(
-        f"SELECT id FROM emails WHERE category IN ({placeholders})",
+        f"SELECT id FROM emails WHERE category IN ({placeholders}) AND (starred = 0 OR starred IS NULL)",
         categories,
     ).fetchall()
     conn.close()
@@ -342,6 +342,238 @@ def api_flagged_counts():
     conn.close()
     counts = {r["category"]: r["cnt"] for r in rows}
     return jsonify({"counts": counts, "total": sum(counts.values())})
+
+
+@app.route("/api/emails/category-counts")
+def api_category_counts():
+    """Get counts for ALL categories with recommended cleanup actions."""
+    conn = db.get_conn()
+    rows = conn.execute("""
+        SELECT category, COUNT(*) as cnt,
+               AVG(confidence) as avg_confidence,
+               SUM(CASE WHEN processed = 1 THEN 1 ELSE 0 END) as processed_count
+        FROM emails
+        GROUP BY category
+        ORDER BY cnt DESC
+    """).fetchall()
+    conn.close()
+
+    # Define recommended actions per category
+    RECOMMENDED = {
+        "spam":         {"action": "trash",   "auto_safe": True,  "icon": "🗑️", "label": "Trash All"},
+        "marketing":    {"action": "archive", "auto_safe": True,  "icon": "📦", "label": "Archive All"},
+        "notification": {"action": "archive", "auto_safe": True,  "icon": "📦", "label": "Archive All"},
+        "personal":     {"action": "keep",    "auto_safe": False, "icon": "👤", "label": "Keep"},
+        "work":         {"action": "keep",    "auto_safe": False, "icon": "💼", "label": "Keep"},
+        "urgent":       {"action": "keep",    "auto_safe": False, "icon": "🚨", "label": "Keep"},
+        "invoice":      {"action": "keep",    "auto_safe": False, "icon": "🧾", "label": "Keep"},
+        "payment":      {"action": "keep",    "auto_safe": False, "icon": "💳", "label": "Keep"},
+    }
+
+    categories = []
+    total_cleanable = 0
+    for r in rows:
+        cat = r["category"] or "none"
+        rec = RECOMMENDED.get(cat, {"action": "archive", "auto_safe": False, "icon": "📧", "label": "Review"})
+        count = r["cnt"]
+        if rec["auto_safe"]:
+            total_cleanable += count
+        categories.append({
+            "category": cat,
+            "count": count,
+            "avg_confidence": round(r["avg_confidence"] or 0, 2),
+            "processed_count": r["processed_count"] or 0,
+            "recommended_action": rec["action"],
+            "auto_safe": rec["auto_safe"],
+            "icon": rec["icon"],
+            "label": rec["label"],
+        })
+    return jsonify({"categories": categories, "total_cleanable": total_cleanable})
+
+
+@app.route("/api/emails/bulk-action", methods=["POST"])
+def api_bulk_action():
+    """Bulk action (archive or trash) all emails in specified categories."""
+    data = request.get_json() or {}
+    categories = data.get("categories", [])
+    action = data.get("action", "trash")  # "trash" or "archive"
+
+    if not categories:
+        return jsonify({"success": False, "error": "No categories specified"}), 400
+
+    conn = db.get_conn()
+    placeholders = ",".join("?" * len(categories))
+    rows = conn.execute(
+        f"SELECT id FROM emails WHERE category IN ({placeholders}) AND (processed = 0 OR processed IS NULL) AND (starred = 0 OR starred IS NULL)",
+        categories,
+    ).fetchall()
+    conn.close()
+
+    email_ids = [r["id"] for r in rows]
+    if not email_ids:
+        return jsonify({"success": True, "actioned": 0, "message": "No matching emails"})
+
+    actioned = 0
+    errors = 0
+    from action_engine import trash_email as _trash, archive_email as _archive, mark_read as _mark_read
+
+    for eid in email_ids:
+        try:
+            if action == "trash":
+                _trash(eid)
+            elif action == "archive":
+                _archive(eid)
+                _mark_read(eid)
+            mark_processed(eid)
+            log_action(eid, f"bulk_{action}", "success",
+                       f"Bulk {action} ({', '.join(categories)})")
+            actioned += 1
+        except Exception as e:
+            errors += 1
+            print(f"  ⚠️  Bulk {action} error {eid}: {e}")
+
+    return jsonify({
+        "success": True,
+        "actioned": actioned,
+        "errors": errors,
+        "total": len(email_ids),
+        "message": f"{action.title()}d {actioned} emails from: {', '.join(categories)}",
+    })
+
+
+@app.route("/api/emails/unsubscribe-candidates")
+def api_unsubscribe_candidates():
+    """Get emails that have unsubscribe URLs grouped by sender."""
+    conn = db.get_conn()
+    rows = conn.execute("""
+        SELECT sender_email, sender, unsubscribe_url, COUNT(*) as email_count,
+               category, MAX(date) as last_date
+        FROM emails
+        WHERE unsubscribe_url IS NOT NULL AND unsubscribe_url != ''
+        GROUP BY sender_email
+        ORDER BY email_count DESC
+        LIMIT 100
+    """).fetchall()
+    conn.close()
+    candidates = [dict(r) for r in rows]
+    return jsonify({"candidates": candidates, "count": len(candidates)})
+
+
+@app.route("/api/emails/auto-clean", methods=["POST"])
+def api_auto_clean():
+    """AI auto-clean: execute all AI-recommended actions on classified emails.
+    The LLM already decided what to do — this just carries it out."""
+    import database as db
+    from action_engine import trash_email as _trash, archive_email as _archive, mark_read as _mark_read
+
+    conn = db.get_conn()
+    rows = conn.execute("""
+        SELECT id, category, llm_action, confidence, unsubscribe_url, sender_email
+        FROM emails
+        WHERE (processed = 0 OR processed IS NULL)
+          AND category IS NOT NULL AND category != ''
+          AND (starred = 0 OR starred IS NULL)
+        ORDER BY confidence DESC
+    """).fetchall()
+    conn.close()
+
+    stats = {"trashed": 0, "archived": 0, "unsubscribed": 0, "kept": 0, "errors": 0}
+    TRASH_CATS = {"spam"}
+    ARCHIVE_CATS = {"marketing", "notification"}
+    KEEP_CATS = {"personal", "work", "urgent", "invoice", "payment"}
+
+    for r in rows:
+        eid = r["id"]
+        cat = r["category"]
+        action = r["llm_action"] or ""
+        try:
+            if cat in TRASH_CATS or action == "trash":
+                _trash(eid)
+                mark_processed(eid)
+                log_action(eid, "ai_auto_trash", "success", f"Category: {cat}")
+                stats["trashed"] += 1
+            elif cat in ARCHIVE_CATS or action == "archive":
+                _archive(eid)
+                _mark_read(eid)
+                mark_processed(eid)
+                log_action(eid, "ai_auto_archive", "success", f"Category: {cat}")
+                stats["archived"] += 1
+            elif action == "unsubscribe" and r["unsubscribe_url"]:
+                from unsubscribe import safe_unsubscribe as _unsub
+                _unsub(r["unsubscribe_url"], r["sender_email"] or "")
+                _archive(eid)
+                _mark_read(eid)
+                mark_processed(eid)
+                log_action(eid, "ai_auto_unsub", "success", f"Unsubscribed: {r['sender_email']}")
+                stats["unsubscribed"] += 1
+            elif cat in KEEP_CATS:
+                # Important — keep but mark processed so we don't re-process
+                mark_processed(eid)
+                stats["kept"] += 1
+            else:
+                # Unknown category — archive to be safe
+                _archive(eid)
+                _mark_read(eid)
+                mark_processed(eid)
+                log_action(eid, "ai_auto_archive", "success", f"Fallback archive: {cat}")
+                stats["archived"] += 1
+        except Exception as e:
+            stats["errors"] += 1
+
+    # Also clear pending actions queue since AI handled everything
+    conn = db.get_conn()
+    conn.execute("UPDATE actions SET status = 'done', notes = 'Auto-executed by AI' WHERE status = 'pending'")
+    conn.commit()
+    conn.close()
+
+    total = stats["trashed"] + stats["archived"] + stats["unsubscribed"] + stats["kept"]
+    return jsonify({
+        "success": True,
+        "total_processed": total,
+        "stats": stats,
+        "message": f"AI cleaned {total} emails: {stats['trashed']} trashed, {stats['archived']} archived, {stats['unsubscribed']} unsubscribed, {stats['kept']} kept",
+    })
+
+
+@app.route("/api/emails/bulk-unsubscribe", methods=["POST"])
+def api_bulk_unsubscribe():
+    """Unsubscribe from multiple senders at once."""
+    data = request.get_json() or {}
+    senders = data.get("senders", [])
+
+    if not senders:
+        return jsonify({"success": False, "error": "No senders specified"}), 400
+
+    from unsubscribe import safe_unsubscribe as _unsub
+    results = {"success": 0, "failed": 0, "details": []}
+
+    conn = db.get_conn()
+    for sender_email in senders:
+        row = conn.execute("""
+            SELECT unsubscribe_url FROM emails
+            WHERE sender_email = ? AND unsubscribe_url IS NOT NULL AND unsubscribe_url != ''
+            LIMIT 1
+        """, (sender_email,)).fetchone()
+        if row:
+            try:
+                result = _unsub(row["unsubscribe_url"], sender_email)
+                if result.get("success"):
+                    results["success"] += 1
+                    results["details"].append({"sender": sender_email, "status": "unsubscribed"})
+                else:
+                    results["failed"] += 1
+                    results["details"].append({"sender": sender_email, "status": "failed"})
+            except Exception as e:
+                results["failed"] += 1
+                results["details"].append({"sender": sender_email, "status": f"error: {e}"})
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "unsubscribed": results["success"],
+        "failed": results["failed"],
+        "details": results["details"],
+    })
 
 
 # ── Pipeline ─────────────────────────────────────────────────────────

@@ -153,49 +153,98 @@ def run_pipeline(max_emails: int = 0) -> dict:
 
             print(f"     🏷️  {classification['category']} ({classification['confidence']:.0%}) → {classification['action']}")
 
-            # Step 3: Route action
+            # Step 3: Route action — AI-driven autonomous mode
             action = classification["action"]
             confidence = classification["confidence"]
             auto_ok = (confidence >= threshold) and (auto_actions < _rate_limit())
+            approval_required = _require_approval()
 
-            if action == "trash" and _auto_archive_spam() and auto_ok:
-                # High-confidence spam → auto-trash
+            if action == "trash" and auto_ok:
+                # AI says trash → do it
                 success = trash_email(email["id"])
                 mark_read(email["id"])
                 mark_processed(email["id"])
+                log_action(email["id"], "auto_trash", "success", f"AI: {classification.get('reason','')}")
                 if success:
                     auto_actions += 1
                     stats["auto_trashed"] += 1
-                    print(f"     🗑️  Auto-trashed (spam)")
+                    print(f"     🗑️  Auto-trashed ({classification['category']})")
                 else:
-                    _queue_action(email["id"], "trash", f"Auto-trash failed, manual review")
+                    _queue_action(email["id"], "trash", f"Auto-trash failed")
 
-            elif action == "archive" and auto_ok and not _require_approval():
+            elif action == "archive" and auto_ok:
+                # AI says archive → do it
                 success = archive_email(email["id"])
                 mark_read(email["id"])
                 mark_processed(email["id"])
+                log_action(email["id"], "auto_archive", "success", f"AI: {classification.get('reason','')}")
                 if success:
                     auto_actions += 1
                     stats["auto_archived"] += 1
-                    print(f"     📦 Auto-archived")
+                    print(f"     📦 Auto-archived ({classification['category']})")
                 else:
                     _queue_action(email["id"], "archive", "Auto-archive failed")
 
-            elif action == "unsubscribe" and _auto_unsubscribe() and email.get("unsubscribe_url"):
+            elif action == "unsubscribe" and email.get("unsubscribe_url"):
+                # AI says unsubscribe → do it
                 result = safe_unsubscribe(email["unsubscribe_url"], email["sender_email"])
+                archive_email(email["id"])
+                mark_read(email["id"])
                 mark_processed(email["id"])
+                log_action(email["id"], "auto_unsubscribe", "success", f"Unsubscribed from {email.get('sender_email')}")
                 auto_actions += 1
                 stats["auto_unsubscribed"] += 1
-                print(f"     🚫 Unsubscribed from {email.get('sender_email')}")
+                print(f"     🚫 Auto-unsubscribed from {email.get('sender_email')}")
 
-            else:
-                # Queue for approval
+            elif action in ("label", "flag") and auto_ok:
+                # AI says label/flag → mark read and label
+                apply_label(email["id"], "AI-Reviewed")
+                mark_read(email["id"])
+                mark_processed(email["id"])
+                log_action(email["id"], "auto_label", "success", f"AI: {classification.get('reason','')}")
+                auto_actions += 1
+                stats["auto_archived"] += 1
+                print(f"     🏷️  Auto-labeled ({classification['category']})")
+
+            elif action == "draft_reply" and classification.get("needs_reply") and email.get("draft_reply"):
+                # AI says reply needed — save draft, mark as needing attention
+                if not approval_required:
+                    create_draft(email.get("sender_email",""), f"Re: {email.get('subject','')}", email["draft_reply"], email.get("thread_id"))
+                    mark_processed(email["id"])
+                    log_action(email["id"], "auto_draft", "success", "AI draft reply created")
+                    auto_actions += 1
+                    print(f"     ✍️  Auto-drafted reply")
+                else:
+                    _queue_action(email["id"], action, classification.get("reason", "") + " | Draft ready")
+                    stats["queued_for_approval"] += 1
+                    print(f"     ⏳ Draft queued for review")
+
+            elif not auto_ok and approval_required:
+                # Low confidence or rate limited — queue for review
                 notes = classification.get("reason", "")
                 if email.get("draft_reply"):
                     notes += f" | Draft ready"
                 _queue_action(email["id"], action, notes)
                 stats["queued_for_approval"] += 1
-                print(f"     ⏳ Queued for approval")
+                print(f"     ⏳ Low confidence, queued for review")
+
+            else:
+                # Fallback: still execute the action if auto mode
+                if not approval_required and auto_ok:
+                    if action in ("trash",):
+                        trash_email(email["id"])
+                    else:
+                        archive_email(email["id"])
+                    mark_read(email["id"])
+                    mark_processed(email["id"])
+                    log_action(email["id"], f"auto_{action}", "success", f"AI fallback: {classification.get('reason','')}")
+                    auto_actions += 1
+                    stats["auto_archived"] += 1
+                    print(f"     🤖 Auto-executed ({action})")
+                else:
+                    _queue_action(email["id"], action, classification.get("reason", ""))
+                    stats["queued_for_approval"] += 1
+                    print(f"     ⏳ Queued for approval")
 
         except Exception as e:
             print(f"  ⚠️  Error processing email {email.get('id')}: {e}")
